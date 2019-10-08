@@ -325,7 +325,7 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
                          parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` <= ' + str(max_key)
         else:
             sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` < ' + str(batch_to)
-        print(sql_select)
+        #print(sql_select)
         sql_data = mysql_source.mysql_source_data(sql_select)
         insert_rows = mysql_target.mysql_target_data(to_table, sql_data)
         insert_rows_list.append(insert_rows)
@@ -385,7 +385,7 @@ class MysqlDataMigrate(object):
             #             str(min_key + (p * per_rows)) + ' and `' + parallel_key + '` < ' + str(min_key + ((p + 1) * per_rows))
             #select_insert_dict = {'table_name': to_table, 'sql_statement': sql_select}
             #sql_select_list.append(select_insert_dict)
-        print(sql_select_list)
+        #print(sql_select_list)
 
         print('[DBM] Inserting data into table `' + to_table + '`')
         #多进程
@@ -393,8 +393,8 @@ class MysqlDataMigrate(object):
             with Pool(final_parallel) as p:
                 insert_rows = p.map(partial(mysql_select_insert, source_db_info=self.source_db_info, target_db_info=self.target_db_info), sql_select_list)
             total_rows = reduce(lambda x, y: x + y, insert_rows)
-            print(insert_rows)
-            print(total_rows)
+            #print(insert_rows)
+            #print(total_rows)
         else:
         #多线程
             thread_list = []
