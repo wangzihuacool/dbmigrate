@@ -131,6 +131,7 @@ class MysqlSource(object):
                     uniq_fk_record['referenced_column_name'] = uniq_fk_record['referenced_column_name'] + ', ' + \
                                                                org_fk_record['referenced_column_name']
             final_fk.append(uniq_fk_record)
+        print(final_fk)
         return final_fk
 
     #获取源库的所有视图,存储过程，函数和routines
@@ -243,7 +244,7 @@ class MysqlTarget(object):
         all_indexes_defination = []
         for j in index_column_info:
             if j.get('non_unique') == 0:
-                sql_index = 'alter table `' + self.to_db + '`.`' + j.get('table') + '` add unique ' + j.get('key_name') + '(' + j.get('column_name') + ')'
+                sql_index = 'alter table `' + self.to_db + '`.`' + j.get('table') + '` add unique index `' + j.get('key_name') + '`(' + j.get('column_name') + ')'
             else:
                 sql_index = 'alter table `' + self.to_db + '`.`' + j.get('table') + '` add index ' + j.get('key_name') + '(' + j.get('column_name') + ')'
             all_indexes_defination.append(sql_index)
@@ -258,8 +259,9 @@ class MysqlTarget(object):
                      final_fk_record.get('column_name') + ') references `' + \
                      final_fk_record.get('referenced_table_schema') + '`.`' + final_fk_record.get('referenced_table_name') + \
                      '`(' + final_fk_record.get('referenced_column_name') + '`)'
+            print(sql_fk)
             fk_rows = self.MysqlTarget.mysql_execute(sql_fk)
-        #print(final_fk)
+
 
     #传输数据到目标表
     def mysql_target_data(self, to_table, data):
