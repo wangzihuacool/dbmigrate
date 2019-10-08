@@ -415,12 +415,12 @@ class MysqlDataMigrate(object):
 
     #mysql数据同步串行/并行选择
     def mysql_parallel_flag(self, from_table, res_tablestatus, res_columns, parallel=0):
-        #用户指定并发数或行数大于10w或空间使用大于10M，并且主键列为int时，设置并发
+        #用户指定并发数或行数大于10w或空间使用大于50M，并且主键列为int时，设置并发
         parallel_flag = 0 if parallel == 0 else 1
         pri_keys = [(record.get('field'), record.get('type')) for record in res_columns if
                     (record['key'] == 'PRI' or record['key'] == 'pri')]
         pri_key_types = [pri_key[1] for pri_key in pri_keys]
-        if (res_tablestatus[0].get('rows') > 100000 or res_tablestatus[0].get('data_length') > 10000000) and 'int' in [key_type for key_type in pri_key_types][0]:
+        if (res_tablestatus[0].get('rows') > 100000 or res_tablestatus[0].get('data_length') > 50000000) and 'int' in [key_type for key_type in pri_key_types][0]:
             #并行主键
             parallel_key = [k[0] for k in pri_keys if 'int' in k[1]][0]
             parallel_flag = 1 if parallel_key else 0
