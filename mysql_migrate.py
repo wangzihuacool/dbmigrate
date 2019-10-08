@@ -210,7 +210,7 @@ class MysqlTarget(object):
             null_defination = 'not null' if res_row.get('null') == 'NO' else ''
             default_defination = ('default ' + res_row.get('default')) if res_row.get('default') else ''
             extra_defination = res_row.get('extra') if res_row.get('extra') else ''
-            comment_defination = ('comment ' + res_row.get('comment')) if res_row.get('comment') else ''
+            comment_defination = ('comment "' + res_row.get('comment') + '"') if res_row.get('comment') else ''
             column_defination = field_defination + ' ' + type_defination + ' ' + charset_defination + ' ' + \
                                 collation_defination + ' ' + null_defination + ' ' + default_defination + ' ' + \
                                 extra_defination + ' ' + comment_defination + ','
@@ -224,7 +224,7 @@ class MysqlTarget(object):
         #处理表默认属性
         engine_defination = 'engine=' + res_tablestatus[0].get('engine', 'InnoDB')
         default_charset_defination = ('default charset=' + res_tablestatus[0].get('collation').split('_')[0]) if res_tablestatus[0].get('collation') else ''
-        default_comment_defination = ('comment="' + res_tablestatus[0].get('comment')) if res_tablestatus[0].get('comment') else ''
+        default_comment_defination = ('comment="' + res_tablestatus[0].get('comment') + '"') if res_tablestatus[0].get('comment') else ''
         all_default_defination = engine_defination + ' ' + default_charset_defination + ' ' + default_comment_defination
 
         #创建目标表
