@@ -19,5 +19,8 @@ SELECT /*!40001 SQL_NO_CACHE */ * FROM `tpcd`.`lineitem` WHERE (`L_ORDERKEY` >= 
 
 6、加载参数，打包后仍然可以使用(done)
 
-
 7、补充mysql的存储过程等不常用模块同步
+
+8、对于行数只有10w行但是主键id的范围很大的情况下的处理优化
+
+9、外键增加 on delete 。。。 on update 。。。操作短句
