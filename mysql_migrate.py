@@ -255,10 +255,10 @@ class MysqlTarget(object):
     def mysql_target_fk(self, final_fk):
         for final_fk_record in final_fk:
             sql_fk = 'alter table `' + final_fk_record.get('table_schema') + '`.`' + final_fk_record.get('table_name') + \
-                     '` add constraint `' + final_fk_record.get('constraint_name') + '` foreign key (' + \
-                     final_fk_record.get('column_name') + ') references `' + \
+                     '` add constraint `' + final_fk_record.get('constraint_name') + '` foreign key (`' + \
+                     final_fk_record.get('column_name') + '`) references `' + \
                      final_fk_record.get('referenced_table_schema') + '`.`' + final_fk_record.get('referenced_table_name') + \
-                     '`(' + final_fk_record.get('referenced_column_name') + '`)'
+                     '`(`' + final_fk_record.get('referenced_column_name') + '`)'
             print(sql_fk)
             fk_rows = self.MysqlTarget.mysql_execute(sql_fk)
 
