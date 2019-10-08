@@ -131,7 +131,7 @@ class MysqlSource(object):
                     uniq_fk_record['referenced_column_name'] = uniq_fk_record['referenced_column_name'] + ', ' + \
                                                                org_fk_record['referenced_column_name']
             final_fk.append(uniq_fk_record)
-        print(final_fk)
+        #print(final_fk)
         return final_fk
 
     #获取源库的所有视图,存储过程，函数和routines
@@ -259,7 +259,7 @@ class MysqlTarget(object):
                      final_fk_record.get('column_name') + '`) references `' + \
                      final_fk_record.get('referenced_table_schema') + '`.`' + final_fk_record.get('referenced_table_name') + \
                      '`(`' + final_fk_record.get('referenced_column_name') + '`)'
-            print(sql_fk)
+            #print(sql_fk)
             fk_rows = self.MysqlTarget.mysql_execute(sql_fk)
 
 
