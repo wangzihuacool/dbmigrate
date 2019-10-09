@@ -307,7 +307,7 @@ class MysqlTarget(object):
 def mysql_select_insert(sql_info, source_db_info, target_db_info):
     mysql_source = MysqlSource(**source_db_info)
     mysql_target = MysqlTarget(**target_db_info)
-    #优化同步逻辑，每进程内循环多次同步数据，每次取batch_rows行记录 --modified at 20190902
+    # 优化同步逻辑，每进程内循环多次同步数据，每次取batch_rows行记录 --modified at 20190902
     from_db = sql_info.get('from_db')
     from_table = sql_info.get('from_table')
     to_table = sql_info.get('to_table')
@@ -315,9 +315,13 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
     from_rowid = sql_info.get('from_rowid')
     to_rowid = sql_info.get('to_rowid')
     max_key = sql_info.get('max_key')
-    #每次同步10w行记录
+    # 每进程每次同步10w行记录，分批循环处理
     batch_rows = 100000
     batch_num = math.ceil((to_rowid - from_rowid)/batch_rows)
+    # 每进程内最大循环批次为100，超过100时则增加每次同步记录数 --modified at 20191009
+    if batch_num > 100:
+        batch_num = 100
+        batch_rows = math.ceil((to_rowid - from_rowid)/100)
     insert_rows_list = []
     for b in range(batch_num):
         batch_from = from_rowid + (b * batch_rows)
@@ -417,12 +421,12 @@ class MysqlDataMigrate(object):
 
     #mysql数据同步串行/并行选择
     def mysql_parallel_flag(self, from_table, res_tablestatus, res_columns, parallel=0):
-        #用户指定并发数或行数大于10w或空间使用大于50M，并且主键列为int时，设置并发
+        #用户指定并发数或行数大于10w或空间使用大于100M，并且主键列为int时，设置并发
         parallel_flag = 0 if parallel == 0 else 1
         pri_keys = [(record.get('field'), record.get('type')) for record in res_columns if
                     (record['key'] == 'PRI' or record['key'] == 'pri')]
         pri_key_types = [pri_key[1] for pri_key in pri_keys]
-        if (res_tablestatus[0].get('rows') > 100000 or res_tablestatus[0].get('data_length') > 50000000) and 'int' in [key_type for key_type in pri_key_types][0]:
+        if (res_tablestatus[0].get('rows') > 100000 or res_tablestatus[0].get('data_length') > 100000000) and 'int' in [key_type for key_type in pri_key_types][0]:
             #并行主键
             parallel_key = [k[0] for k in pri_keys if 'int' in k[1]][0]
             parallel_flag = 1 if parallel_key else 0
@@ -437,7 +441,7 @@ class MysqlDataMigrate(object):
         #计算实际并发数=用户指定并发数；如未指定，实际并发数=round(表记录数/10w)
         if parallel == 0:
             auto_parallel = round(int(res_tablestatus[0].get('rows'))/100000)
-            final_parallel = min(auto_parallel, max_parallel)
+            final_parallel = max(min(auto_parallel, max_parallel), 1)
         else:
             final_parallel = min(parallel, max_parallel)
 
