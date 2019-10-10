@@ -274,9 +274,14 @@ class MysqlTarget(object):
         else:
             return 0
 
-    #目标库执行sql
+    # 目标库执行sql
     def mysql_target_execute(self, sql):
         affect_rows = self.MysqlTargetDb.mysql_execute(sql)
+        return affect_rows
+
+    # 目标库执行sql (no transaction)
+    def mysql_target_execute_no_trans(self, sql):
+        affect_rows = self.MysqlTargetDb.mysql_execute_no_trans(sql)
         return affect_rows
 
     def mysql_target_close(self):

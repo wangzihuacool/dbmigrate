@@ -14,6 +14,7 @@ if __name__ == '__main__':
     #连接mysql源库和目标库
     begin_time = time.time()
     target_db = target_db if target_db else source_db
+    to_db = target_db
     source_db_info = {'host': source_host, 'port': source_port, 'db': source_db, 'user': source_user,
                       'password': source_password, 'charset': 'utf8'}
     target_db_info = {'host': target_host, 'port': target_port, 'db': target_db, 'user': target_user,
@@ -108,7 +109,7 @@ if __name__ == '__main__':
                 to_table = from_table
                 if to_table in exist_table_list and table_exists_action == 'drop':
                     # 删除目标表
-                    mysql_target.mysql_target_execute('drop table if exists `' + to_table + '`')
+                    mysql_target.mysql_target_execute_no_trans('drop table if exists `' + to_db + '`.`' + to_table + '`')
                     # 创建表
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
                                                     res_tablestatus=res_tablestatus)
@@ -133,7 +134,7 @@ if __name__ == '__main__':
 
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
                     # truncate目标表
-                    mysql_target.mysql_target_execute('truncate table `' + to_table + '`')
+                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table, res_tablestatus, res_columns, parallel=parallel)
@@ -203,7 +204,7 @@ if __name__ == '__main__':
                 to_table = from_table
                 if to_table in exist_table_list and table_exists_action == 'drop':
                     # 删除目标表
-                    mysql_target.mysql_target_execute('drop table if exists `' + to_table + '`')
+                    mysql_target.mysql_target_execute_no_trans('drop table if exists `' + to_db + '`.`' + to_table + '`')
                     # 创建表
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
                                                     res_tablestatus=res_tablestatus)
@@ -249,7 +250,7 @@ if __name__ == '__main__':
                     exit(1)
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
                     # truncate目标表
-                    mysql_target.mysql_target_execute('truncate table `' + target_db + '`.`' + to_table + '`')
+                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,

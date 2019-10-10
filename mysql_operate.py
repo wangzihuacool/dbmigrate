@@ -75,6 +75,19 @@ class MysqlOperate(object):
             finally:
                 return numrows
 
+    # mysql的DCL语句或不需要事务的DML语句
+    def mysql_execute_no_trans(self, sql, *args):
+        with self.connection.cursor() as conn_cursor:
+            try:
+                conn_cursor.execute(sql, *args)
+                numrows = conn_cursor.rowcount
+            except Exception as e:
+                traceback.print_exc()
+                self.connection.rollback()
+                numrows = None
+            finally:
+                return numrows
+
     #mysql的批量插入语句
     #@performance
     def mysql_executemany(self, sql, data):
