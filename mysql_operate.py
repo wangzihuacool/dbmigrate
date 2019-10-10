@@ -71,7 +71,7 @@ class MysqlOperate(object):
             except Exception as e:
                 traceback.print_exc()
                 self.connection.rollback()
-                numrows = None
+                numrows = 0
             finally:
                 return numrows
 
@@ -84,7 +84,7 @@ class MysqlOperate(object):
             except Exception as e:
                 traceback.print_exc()
                 self.connection.rollback()
-                numrows = None
+                numrows = 0
             finally:
                 return numrows
 
@@ -100,7 +100,7 @@ class MysqlOperate(object):
             except Exception as e:
                 traceback.print_exc()
                 self.connection.rollback()
-                numrows = None
+                numrows = 0
             finally:
                 return numrows
 
