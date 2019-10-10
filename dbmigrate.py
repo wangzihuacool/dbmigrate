@@ -244,7 +244,13 @@ if __name__ == '__main__':
                 # 目标表
                 exist_table_list = mysql_target.mysql_target_exist_tables()
                 to_table = from_table
-                if to_table in exist_table_list:
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # truncate目标表
+                    mysql_target.mysql_target_execute('truncate table `' + target_db + '`.`' + to_table + '`')
+                    # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
                                                                                                                  res_tablestatus,
@@ -257,6 +263,23 @@ if __name__ == '__main__':
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
                     print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 同步数据
+                    mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(
+                        from_table,
+                        res_tablestatus,
+                        res_columns,
+                        parallel=parallel)
+                    if parallel_flag == 0:
+                        total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
+                    else:
+                        total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
+                                                                      parallel_key=parallel_key,
+                                                                      parallel_method=parallel_method)
+                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
         else:

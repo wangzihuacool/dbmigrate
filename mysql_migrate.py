@@ -172,9 +172,9 @@ class MysqlTarget(object):
         new_db_info = copy.deepcopy(target_db_info)
         new_db_info['db'] = None
         try:
-            self.MysqlTarget = MysqlOperate(**new_db_info)
+            self.MysqlTargetDb = MysqlOperate(**new_db_info)
             self.to_db = target_db_info.get('db')
-            self.MysqlTarget.mysql_execute('use %s' % self.to_db)
+            self.MysqlTargetDb.mysql_execute('use %s' % self.to_db)
         except Exception as e:
             print('DBM Error: can not connect to target db: ' + target_db_info.get('host') + ':' +
                   str(target_db_info.get('port')) + '/' + target_db_info.get('db'))
@@ -183,24 +183,24 @@ class MysqlTarget(object):
 
     #创建目标数据库
     def mysql_target_createdb(self, migrate_granularity):
-        res_db = self.MysqlTarget.mysql_select('show databases')
+        res_db = self.MysqlTargetDb.mysql_select('show databases')
         if self.to_db in [db[0] for db in res_db] and migrate_granularity == 'db':
-            self.MysqlTarget.mysql_execute('drop database if exists %s' % self.to_db)
-            self.MysqlTarget.mysql_execute('create database if not exists %s' % self.to_db)
+            self.MysqlTargetDb.mysql_execute('drop database if exists %s' % self.to_db)
+            self.MysqlTargetDb.mysql_execute('create database if not exists %s' % self.to_db)
         elif self.to_db in [db[0] for db in res_db] and migrate_granularity == 'table':
             pass
         else:
-            self.MysqlTarget.mysql_execute('create database if not exists %s' % self.to_db)
+            self.MysqlTargetDb.mysql_execute('create database if not exists %s' % self.to_db)
 
     #检查目标库已存在的表
     def mysql_target_exist_tables(self):
-        res_tables = self.MysqlTarget.mysql_select('show full tables from `%s` where table_type != "VIEW"' % self.to_db)
+        res_tables = self.MysqlTargetDb.mysql_select('show full tables from `%s` where table_type != "VIEW"' % self.to_db)
         all_table_list = [table[0] for table in res_tables]
         return all_table_list
 
     #目标库创建表
     def mysql_target_table(self, to_table, table_exists_action, res_columns=None, res_tablestatus=None):
-        self.MysqlTarget.mysql_execute('use %s' % self.to_db)
+        self.MysqlTargetDb.mysql_execute('use %s' % self.to_db)
         #处理列信息
         all_columns_defination = ''
         for res_row in res_columns:
@@ -235,7 +235,7 @@ class MysqlTarget(object):
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination_1 + ')' + all_default_defination
         #print(sql_table_defination)
         print('[DBM] Create table `' + to_table + '`')
-        table_rows = self.MysqlTarget.mysql_execute(sql_table_defination)
+        table_rows = self.MysqlTargetDb.mysql_execute(sql_table_defination)
 
     #创建索引
     #@performance
@@ -248,7 +248,7 @@ class MysqlTarget(object):
             else:
                 sql_index = 'alter table `' + self.to_db + '`.`' + j.get('table') + '` add index ' + j.get('key_name') + '(' + j.get('column_name') + ')'
             all_indexes_defination.append(sql_index)
-            index_rows = self.MysqlTarget.mysql_execute(sql_index)
+            index_rows = self.MysqlTargetDb.mysql_execute(sql_index)
         #print(all_indexes_defination)
 
     #创建外键
@@ -260,7 +260,7 @@ class MysqlTarget(object):
                      final_fk_record.get('referenced_table_schema') + '`.`' + final_fk_record.get('referenced_table_name') + \
                      '`(`' + final_fk_record.get('referenced_column_name') + '`)'
             #print(sql_fk)
-            fk_rows = self.MysqlTarget.mysql_execute(sql_fk)
+            fk_rows = self.MysqlTargetDb.mysql_execute(sql_fk)
 
 
     #传输数据到目标表
@@ -269,18 +269,18 @@ class MysqlTarget(object):
             str_list = ['%s' for i in range(len(data[0]))]
             value_str = ','.join(str_list)
             insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '` values (' + value_str + ')'
-            data_rows = self.MysqlTarget.mysql_executemany(insert_sql, data)
+            data_rows = self.MysqlTargetDb.mysql_executemany(insert_sql, data)
             return data_rows
         else:
             return 0
 
     #目标库执行sql
     def mysql_target_execute(self, sql):
-        affect_rows = self.MysqlTarget.mysql_execute(sql)
+        affect_rows = self.MysqlTargetDb.mysql_execute(sql)
         return affect_rows
 
     def mysql_target_close(self):
-        self.MysqlTarget.close()
+        self.MysqlTargetDb.close()
 
 
 
