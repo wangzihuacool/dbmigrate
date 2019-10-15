@@ -209,7 +209,12 @@ class MysqlTarget(object):
             charset_defination = ('character set ' + res_row.get('collation').split('_')[0]) if res_row.get('collation') else ''
             collation_defination = ('collate ' + res_row.get('collation')) if res_row.get('collation') else ''
             null_defination = 'not null' if res_row.get('null') == 'NO' else ''
-            default_defination = ('default ' + res_row.get('default')) if res_row.get('default') else ''
+            if res_row.get('default'):
+                default_defination = 'default ' + res_row.get('default')
+            elif res_row.get('default') == '':
+                default_defination = 'default ""'
+            else:
+                default_defination = 'default null'
             extra_defination = res_row.get('extra') if res_row.get('extra') else ''
             comment_defination = ('comment "' + res_row.get('comment') + '"') if res_row.get('comment') else ''
             column_defination = field_defination + ' ' + type_defination + ' ' + charset_defination + ' ' + \
@@ -225,8 +230,11 @@ class MysqlTarget(object):
         #处理表默认属性
         engine_defination = 'engine=' + res_tablestatus[0].get('engine', 'InnoDB')
         default_charset_defination = ('default charset=' + res_tablestatus[0].get('collation').split('_')[0]) if res_tablestatus[0].get('collation') else ''
+        default_collation_defination = ('collate=' + res_tablestatus[0].get('collation')) if res_tablestatus[0].get('collation') else ''
+        create_options_defination = res_tablestatus[0].get('create_options')
         default_comment_defination = ('comment="' + res_tablestatus[0].get('comment') + '"') if res_tablestatus[0].get('comment') else ''
-        all_default_defination = engine_defination + ' ' + default_charset_defination + ' ' + default_comment_defination
+        all_default_defination = engine_defination + ' ' + default_charset_defination + ' ' + \
+                                 default_collation_defination + ' ' + create_options_defination + ' ' + default_comment_defination
 
         #创建目标表
         if pri_key_defination:
@@ -254,12 +262,12 @@ class MysqlTarget(object):
     #创建外键
     def mysql_target_fk(self, final_fk):
         for final_fk_record in final_fk:
-            sql_fk = 'alter table `' + final_fk_record.get('table_schema') + '`.`' + final_fk_record.get('table_name') + \
-                     '` add constraint `' + final_fk_record.get('constraint_name') + '` foreign key (`' + \
-                     final_fk_record.get('column_name') + '`) references `' + \
-                     final_fk_record.get('referenced_table_schema') + '`.`' + final_fk_record.get('referenced_table_name') + \
-                     '`(`' + final_fk_record.get('referenced_column_name') + '`) on delete ' + final_fk_record.get('delete_rule') + \
-                     ' on update ' + final_fk_record.get('update_rule')
+            # 外键对应表所在schema为to_db
+            sql_fk = 'alter table `' + self.to_db + '`.`' + final_fk_record.get('table_name') + '` add constraint `' + \
+                     final_fk_record.get('constraint_name') + '` foreign key (`' + final_fk_record.get('column_name') + \
+                     '`) references `' + self.to_db + '`.`' + final_fk_record.get('referenced_table_name') + \
+                     '`(`' + final_fk_record.get('referenced_column_name') + '`) on delete ' + \
+                     final_fk_record.get('delete_rule') + ' on update ' + final_fk_record.get('update_rule')
             #print(sql_fk)
             fk_rows = self.MysqlTargetDb.mysql_execute(sql_fk)
 
