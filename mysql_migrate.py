@@ -208,7 +208,7 @@ class MysqlTarget(object):
             type_defination = res_row.get('type')
             charset_defination = ('character set ' + res_row.get('collation').split('_')[0]) if res_row.get('collation') else ''
             collation_defination = ('collate ' + res_row.get('collation')) if res_row.get('collation') else ''
-            null_defination = 'not null' if res_row.get('null') == 'NO' else ''
+            null_defination = 'not null' if res_row.get('null') == 'NO' else 'null'
             if res_row.get('default'):
                 default_defination = 'default ' + res_row.get('default')
             elif res_row.get('default') == '':
