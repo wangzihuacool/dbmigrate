@@ -213,8 +213,10 @@ class MysqlTarget(object):
                 default_defination = 'default ' + res_row.get('default')
             elif res_row.get('default') == '':
                 default_defination = 'default ""'
-            else:
+            elif not res_row.get('default') and res_row.get('null') == 'YES':
                 default_defination = 'default null'
+            else:
+                default_defination = ''
             extra_defination = res_row.get('extra') if res_row.get('extra') else ''
             comment_defination = ('comment "' + res_row.get('comment') + '"') if res_row.get('comment') else ''
             column_defination = field_defination + ' ' + type_defination + ' ' + charset_defination + ' ' + \
