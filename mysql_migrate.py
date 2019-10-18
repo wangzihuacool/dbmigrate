@@ -159,7 +159,6 @@ class MysqlSource(object):
         from_events = [event[0] for event in res_events]
         return from_views, from_procedures, from_functions, from_routines, from_events
 
-
     def mysql_source_close(self):
         self.MysqlDb.close()
 
@@ -319,7 +318,7 @@ class MysqlTarget(object):
 
 
 
-#mysql源库查询和目标库插入(for 并行)
+# 源库是mysql时的查询和目标库插入(for 并行)
 def mysql_select_insert(sql_info, source_db_info, target_db_info):
     mysql_source = MysqlSource(**source_db_info)
     mysql_target = MysqlTarget(**target_db_info)
@@ -355,7 +354,7 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
     return total_rows
 
 
-#mysql并行/串行处理
+# 源库是mysql时的并行/串行数据处理
 class MysqlDataMigrate(object):
     def __init__(self, source_db_info, target_db_info):
         self.source_db_info = source_db_info
@@ -363,7 +362,7 @@ class MysqlDataMigrate(object):
         self.mysql_source = MysqlSource(**source_db_info)
         self.mysql_target = MysqlTarget(**target_db_info)
 
-    #mysql数据同步串行处理方法
+    # 源库是mysql时的数据同步串行处理方法
     def mysql_serial_migrate(self, from_table, to_table):
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
@@ -383,7 +382,7 @@ class MysqlDataMigrate(object):
         total_rows = reduce(lambda x, y: x + y, insert_rows_list) if insert_rows_list else 0
         return total_rows
 
-    #mysql数据同步并行处理方法
+    # 源库是mysql时的数据同步的并行处理方法
     def mysql_parallel_migrate(self, from_table, to_table, final_parallel, parallel_key=None, parallel_method='multiprocess'):
         #分批数据
         from_db = self.source_db_info.get('db')
@@ -435,7 +434,7 @@ class MysqlDataMigrate(object):
             total_rows = reduce(lambda x, y: x + y, result_list)
         return total_rows
 
-    #mysql数据同步串行/并行选择
+    # 源库是mysql时的数据同步串行/并行选择
     def mysql_parallel_flag(self, from_table, res_tablestatus, res_columns, parallel=0):
         #用户指定并发数或行数大于10w或空间使用大于100M，并且主键列为int时，设置并发
         parallel_flag = 0 if parallel == 0 else 1
@@ -460,6 +459,5 @@ class MysqlDataMigrate(object):
             final_parallel = max(min(auto_parallel, max_parallel), 1)
         else:
             final_parallel = min(parallel, max_parallel)
-
         return parallel_flag, final_parallel, parallel_key, parallel_method
 

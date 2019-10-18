@@ -1,2 +1,3 @@
 pymysql
+cx-Oracle
 pysnooper
