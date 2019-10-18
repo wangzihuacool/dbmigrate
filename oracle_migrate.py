@@ -74,7 +74,7 @@ class OracleTarget(object):
         return all_table_list
 
     # 传输数据到目标表
-    def oracle_target_data(self, to_table, data):
+    def insert_target_data(self, to_table, data):
         if data:
             str_list = ['%s' for i in range(len(data[0]))]
             value_str = ','.join(str_list)

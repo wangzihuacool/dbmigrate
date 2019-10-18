@@ -13,6 +13,7 @@ import os
 import math
 import copy
 from mysql_operate import MysqlOperate
+from oracle_migrate import OracleTarget
 from comm_decorator import performance, MyThread
 #import warnings
 #from itertools import groupby
@@ -274,7 +275,7 @@ class MysqlTarget(object):
 
 
     #传输数据到目标表
-    def mysql_target_data(self, to_table, data):
+    def insert_target_data(self, to_table, data):
         if data:
             str_list = ['%s' for i in range(len(data[0]))]
             value_str = ','.join(str_list)
@@ -299,29 +300,17 @@ class MysqlTarget(object):
 
 
 
-
-#源库和目标库都是mysql时的数据同步
-#class MysqlSourceTarget(object):
-#    def __init__(self, source_db_info, target_db_info):
-#        self.source_db_info = source_db_info
-#        self.target_db_info = target_db_info
-#        self.mysql_source = MysqlSource(**source_db_info)
-#        self.mysql_target = MysqlTarget(**target_db_info)
-#
-#    #mysql源库查询和目标库插入
-#    def mysql_select_insert(self, sql_info):
-#        to_table = sql_info.get('table_name')
-#        sql_select = sql_info.get('sql_statement')
-#        sql_data = self.mysql_source.mysql_source_data_incr(sql_select)
-#        insert_rows = self.mysql_target.mysql_target_data(to_table, sql_data)
-#        return insert_rows
-
-
-
-# 源库是mysql时的查询和目标库插入(for 并行)
+# 源库是mysql时的查询和目标库插入方法(for 并行同步)
 def mysql_select_insert(sql_info, source_db_info, target_db_info):
     mysql_source = MysqlSource(**source_db_info)
-    mysql_target = MysqlTarget(**target_db_info)
+    # 判断目标数据库类型，根据不同类型调用不同的插入方法(不同类型数据库的插入方法名保持一致)
+    target_db_type = target_db_info.get('target_db_type')
+    if target_db_type == 'mysql':
+        multi_db_target = MysqlTarget(**target_db_info)
+    elif target_db_type == 'oracle':
+        multi_db_target = OracleTarget(**target_db_info)
+    else:
+        pass
     # 优化同步逻辑，每进程内循环多次同步数据，每次取batch_rows行记录 --modified at 20190902
     from_db = sql_info.get('from_db')
     from_table = sql_info.get('from_table')
@@ -348,7 +337,7 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
             sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` < ' + str(batch_to)
         #print(sql_select)
         sql_data = mysql_source.mysql_source_data(sql_select)
-        insert_rows = mysql_target.mysql_target_data(to_table, sql_data)
+        insert_rows = multi_db_target.insert_target_data(to_table, sql_data)
         insert_rows_list.append(insert_rows)
     total_rows = reduce(lambda x, y: x + y, insert_rows_list)
     return total_rows
@@ -360,7 +349,14 @@ class MysqlDataMigrate(object):
         self.source_db_info = source_db_info
         self.target_db_info = target_db_info
         self.mysql_source = MysqlSource(**source_db_info)
-        self.mysql_target = MysqlTarget(**target_db_info)
+        # 判断目标数据库类型，根据不同类型调用不同的插入方法(不同类型数据库的插入方法名保持一致)
+        self.target_db_type = target_db_info.get('target_db_type')
+        if self.target_db_type == 'mysql':
+            self.multi_db_target = MysqlTarget(**target_db_info)
+        elif self.target_db_type == 'oracle':
+            self.multi_db_target = OracleTarget(**target_db_info)
+        else:
+            pass
 
     # 源库是mysql时的数据同步串行处理方法
     def mysql_serial_migrate(self, from_table, to_table):
@@ -375,7 +371,7 @@ class MysqlDataMigrate(object):
         while True:
             data_incr = next(res_data_incr)
             if data_incr:
-                insert_rows = self.mysql_target.mysql_target_data(to_table, data_incr)
+                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr)
                 insert_rows_list.append(insert_rows)
             else:
                 break

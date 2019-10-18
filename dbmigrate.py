@@ -359,9 +359,9 @@ if __name__ == '__main__':
     target_db = target_db if target_db else source_db
     to_db = target_db
     source_db_info = {'host': source_host, 'port': source_port, 'db': source_db, 'user': source_user,
-                      'password': source_password, 'charset': 'utf8'}
+                      'password': source_password, 'charset': 'utf8', 'source_db_type': source_db_type}
     target_db_info = {'host': target_host, 'port': target_port, 'db': target_db, 'user': target_user,
-                      'password': target_password, 'charset': 'utf8'}
+                      'password': target_password, 'charset': 'utf8', 'target_db_type': target_db_type}
 
     #判断同步粒度
     if source_tables:
