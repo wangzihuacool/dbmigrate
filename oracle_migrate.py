@@ -13,7 +13,6 @@ import os
 import math
 import copy
 from db_operate import DbOperate
-from mysql_migrate import MysqlSource
 from comm_decorator import performance, MyThread
 
 
@@ -96,6 +95,7 @@ class OracleTarget(object):
 # 源库是oracle时的并行/串行数据处理
 class OracleDataMigrate(object):
     def __init__(self, source_db_info, target_db_info):
+        from mysql_migrate import MysqlSource
         self.source_db_info = source_db_info
         self.target_db_info = target_db_info
         self.mysql_source = MysqlSource(**source_db_info)
