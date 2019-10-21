@@ -309,17 +309,16 @@ def mysql_to_oracle():
                     print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
                     sys.exit(1)
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
-                    # truncate目标表
+                    # 先truncate目标表，然后追加数据
                     truncate_sql = 'truncate table ' + to_table
                     oracle_target.oracle_execute_dml(truncate_sql)
                     # 同步数据, 源库是mysql，执行MysqlDataMigrate
-                    # to_do 20191018
-                    '''
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
-                                                                                                                 res_tablestatus,
-                                                                                                                 res_columns,
-                                                                                                                 parallel=parallel)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(
+                        from_table,
+                        res_tablestatus,
+                        res_columns,
+                        parallel=parallel)
                     if parallel_flag == 0:
                         total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
                     else:
@@ -328,7 +327,7 @@ def mysql_to_oracle():
                                                                       parallel_method=parallel_method)
                     print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
-                    # 同步数据
+                    # 数据追加到目标表
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(
                         from_table,
@@ -346,7 +345,6 @@ def mysql_to_oracle():
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
-                '''
         else:
             print("[DBM] error 999 : 目前Mysql->Oracle的异构数据库同步只支持表级别的数据同步(content='data')!")
             sys.exit(1)
