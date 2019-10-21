@@ -307,7 +307,8 @@ def mysql_to_oracle():
                     exit(1)
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
                     # truncate目标表
-                    oracle_target.oracle_execute_dml('truncate table ' + to_table)
+                    truncate_sql = 'truncate table ' + to_table
+                    oracle_target.oracle_execute_dml(truncate_sql)
                     # 同步数据, 源库是mysql，执行MysqlDataMigrate
                     # to_do 20191018
                     '''
