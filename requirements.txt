@@ -1,3 +1,4 @@
 pymysql
 cx-Oracle
 pysnooper
+# oracle同步时需要安装oracle客户端

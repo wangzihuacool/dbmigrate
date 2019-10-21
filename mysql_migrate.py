@@ -280,6 +280,8 @@ class MysqlTarget(object):
             str_list = ['%s' for i in range(len(data[0]))]
             value_str = ','.join(str_list)
             insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '` values (' + value_str + ')'
+            # 默认情况下，自增列插入0或null时，该列使用auto_increment自增；修改sql_mode使得插入0时就插入数字0，以匹配阿里云的配置。
+            self.MysqlTargetDb.mysql_execute_no_trans("set sql_mode='NO_AUTO_VALUE_ON_ZERO'")
             data_rows = self.MysqlTargetDb.mysql_executemany(insert_sql, data)
             return data_rows
         else:
