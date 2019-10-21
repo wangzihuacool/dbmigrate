@@ -84,7 +84,7 @@ class OracleTarget(object):
             return 0
 
     # 目标库执行SQL
-    def oracle_execute_dml(self):
+    def oracle_execute_dml(self, sql):
         affect_rows = self.OracleTargetConn.executedml(sql)
         return affect_rows
 
