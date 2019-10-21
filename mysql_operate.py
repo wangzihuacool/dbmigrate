@@ -11,9 +11,10 @@ import pysnooper
 from comm_decorator import performance
 
 
+warnings.filterwarnings("ignore")
 
 
-#mysql数据库操作类
+# mysql数据库操作类
 class MysqlOperate(object):
     def __init__(self, **db_info):
         self.host = db_info.get('host')
