@@ -75,9 +75,11 @@ class OracleTarget(object):
     # 传输数据到目标表
     def insert_target_data(self, to_table, data):
         if data:
-            str_list = ['%s' for i in range(len(data[0]))]
+            str_list = [(':' + str(i)) for i in range(len(data[0]))]
             value_str = ','.join(str_list)
             insert_sql = 'insert into ' + to_table + ' values (' + value_str + ')'
+            # cx-Oracle调用executemany插入时需要数据集为元祖组成的list
+            data = list(data) if not isinstance(data, list) else data
             data_rows = self.OracleTargetConn.insertbatch(insert_sql, data)
             return data_rows
         else:

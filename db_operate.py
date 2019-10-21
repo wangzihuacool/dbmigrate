@@ -107,9 +107,9 @@ class DbOperate(object):
         results = self.cursor.fetchall()
         return results
 
-    def insertbatch(self, sql, params, arraydmlrowcounts=True):
+    def insertbatch(self, sql, params):
         self.conn.begin()
-        self.cursor.executemany(sql, params)
+        self.cursor.executemany(sql, params, arraydmlrowcounts=True)
         self.conn.commit()
         numrows = self.cursor.rowcount
         return numrows
