@@ -87,7 +87,8 @@ class DbOperate(object):
             #                                                increment=increment,timeout=timeout, mode = cx_Oracle.SYSDBA)
         #如果连接池已创建，则可以直接从连接池获取连接
         else:
-            print('SessionPool __ConnPool exists,Acquire connection from pool')
+            pass
+            # print('SessionPool __ConnPool exists,Acquire connection from pool')
             #print(str(DbOperate.__ConnPool.timeout) + 's')
 
         #打印SessionPool中当前已分配的会话数和打开的会话数
