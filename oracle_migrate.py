@@ -41,6 +41,7 @@ class OracleSource(object):
         return from_tables, migrate_granularity
     '''
 
+
 # 目标库为oracle时装载数据
 class OracleTarget(object):
     # 检查目标库连接
@@ -53,8 +54,10 @@ class OracleTarget(object):
         self.charset = target_db_info.get('charset')
         try:
             self.OracleTargetConn = DbOperate(self.hostname, self.port, self.username, self.password,
-                                              service_name=self.service_name, session_pool='Y', min=1, max=100,
-                                              increment=4, charset=self.charset)
+                                              service_name=self.service_name)
+            #self.OracleTargetConn = DbOperate(self.hostname, self.port, self.username, self.password,
+            #                                  service_name=self.service_name, session_pool='Y', min=1, max=100,
+            #                                  increment=4, charset=self.charset)
         except Exception as e:
             print('DBM Error: can not connect to target db: ' + target_db_info.get('host') + ':' +
                   str(target_db_info.get('port')) + '/' + target_db_info.get('db'))
@@ -90,7 +93,7 @@ class OracleTarget(object):
         affect_rows = self.OracleTargetConn.executedml(sql)
         return affect_rows
 
-    def mysql_target_close(self):
+    def oracle_target_close(self):
         self.OracleTargetConn.close()
 
 
