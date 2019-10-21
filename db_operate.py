@@ -20,7 +20,7 @@ class DbOperate(object):
     """
     def __init__(self, host, port, username, password, db=None, sid=None,
                  service_name=None, mode=None, session_pool=None, min=None,
-                 max=None, increment=None, timeout=None, charset="utf8"):
+                 max=None, increment=None, timeout=5, charset="utf8"):
         self.host = host
         self.port = port
         self.username = username
@@ -70,13 +70,13 @@ class DbOperate(object):
     #静态方法无需实例化即可调用
     @staticmethod
     def get_session_pool(username, password, host, port, service_name, mode=None,
-                         min=None, max=None, increment=None,timeout=None):
+                         min=None, max=None, increment=None, timeout=5):
         #如果连接池没有创建，则创建连接池(注意：连接池方式不能使用sysdba连接)
         if DbOperate.__ConnPool is None:
             #print('Init SessionPool __ConnPool')
             handle = "%s:%s/%s" % (host, str(port), service_name)
             DbOperate.__ConnPool = cx_Oracle.SessionPool(username, password, handle, min=min, max=max,
-                                                         increment=increment,timeout=timeout)
+                                                         increment=increment, timeout=timeout)
             #if mode is None:
             #    handle = "%s:%s/%s" % (host, str(port), service_name)
             #    DbOperate.__ConnPool = cx_Oracle.SessionPool(username, password, handle, min=min, max=max,
