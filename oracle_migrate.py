@@ -9,7 +9,7 @@ from operator import ne, eq
 from functools import reduce, partial
 from multiprocessing import cpu_count, Process, Pool
 import threading
-import os
+import os, sys
 import math
 import copy
 from db_operate import DbOperate
@@ -34,7 +34,7 @@ class OracleSource(object):
             else:
                 not_exists_tables = set(source_tables) - set(all_table_list)
                 print('[DBM] Error: 源数据库[' + self.from_db + ']中不存在表:' + str(not_exists_tables) + '.请确认!')
-                exit(1)
+                sys.exit(1)
         else:
             from_tables = all_table_list
             migrate_granularity = 'db'
@@ -59,7 +59,7 @@ class OracleTarget(object):
             print('DBM Error: can not connect to target db: ' + target_db_info.get('host') + ':' +
                   str(target_db_info.get('port')) + '/' + target_db_info.get('db'))
             traceback.print_exc()
-            exit(1)
+            sys.exit(1)
 
     # Oracle目标库元数据创建
     def oracle_metadata(self):

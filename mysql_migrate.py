@@ -9,7 +9,7 @@ from operator import ne, eq
 from functools import reduce, partial
 from multiprocessing import cpu_count, Process, Pool
 import threading
-import os
+import os, sys
 import math
 import copy
 from mysql_operate import MysqlOperate
@@ -32,7 +32,7 @@ class MysqlSource(object):
             print('[DBM] Error: can not connect to source db: ' + source_db_info.get('host') + ':' +
                   str(source_db_info.get('port')) + '/' + source_db_info.get('db'))
             traceback.print_exc()
-            exit(1)
+            sys.exit(1)
 
     #检查源库是否存在
     def source_db_check(self):
@@ -41,7 +41,7 @@ class MysqlSource(object):
             pass
         else:
             print('[DBM] Error: Source db [' + self.from_db + '] not found.请确认!')
-            exit(1)
+            sys.exit(1)
 
     #检查配置文件中的表在源库是否存在，未配置则全部表同步
     def source_table_check(self, *source_tables):
@@ -54,7 +54,7 @@ class MysqlSource(object):
             else:
                 not_exists_tables = set(source_tables) - set(all_table_list)
                 print('[DBM] Error: 源数据库[' + self.from_db + ']中不存在表:' + str(not_exists_tables) + '.请确认!')
-                exit(1)
+                sys.exit(1)
         else:
             from_tables = all_table_list
             migrate_granularity = 'db'
@@ -179,7 +179,7 @@ class MysqlTarget(object):
             print('DBM Error: can not connect to target db: ' + target_db_info.get('host') + ':' +
                   str(target_db_info.get('port')) + '/' + target_db_info.get('db'))
             traceback.print_exc()
-            exit(1)
+            sys.exit(1)
 
     #创建目标数据库
     def mysql_target_createdb(self, migrate_granularity):
