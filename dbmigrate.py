@@ -4,7 +4,7 @@
 数据库迁移主程序
 '''
 import traceback
-import time
+import time, sys
 from env import *
 from mysql_migrate import MysqlSource, MysqlTarget, MysqlDataMigrate
 from oracle_migrate import OracleTarget
@@ -82,10 +82,10 @@ def mysql_to_mysql():
 
         elif content == 'data':
             print('[DBM] error 100 : 参数错误，content=\'data\' 仅适用于表同步.')
-            exit(1)
+            sys.exit(1)
         else:
             print('[DBM] error 100 : 参数错误，content=%s.' % content)
-            exit(1)
+            sys.exit(1)
     # mysql -> mysql 表级别同步
     elif migrate_granularity == 'table':
         # 同步所有表元数据+数据
@@ -177,7 +177,7 @@ def mysql_to_mysql():
                     # to_do
                 else:
                     print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
-                    exit(1)
+                    sys.exit(1)
 
             # 外键同步
             final_fk = mysql_source.mysql_source_fk(from_tables)
@@ -205,10 +205,10 @@ def mysql_to_mysql():
                     # to_do
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
                     print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
-                    exit(1)
+                    sys.exit(1)
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
-                    exit(1)
+                    sys.exit(1)
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     continue
                 elif to_table not in exist_table_list:
@@ -222,7 +222,7 @@ def mysql_to_mysql():
                     # to_do
                 else:
                     print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
-                    exit(1)
+                    sys.exit(1)
             # 外键同步
             final_fk = mysql_source.mysql_source_fk(from_tables)
             mysql_target.mysql_target_fk(final_fk)
@@ -237,7 +237,7 @@ def mysql_to_mysql():
                 to_table = from_table
                 if to_table in exist_table_list and table_exists_action == 'drop':
                     print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
-                    exit(1)
+                    sys.exit(1)
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
                     # truncate目标表
                     mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
@@ -275,6 +275,9 @@ def mysql_to_mysql():
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
         else:
             print('[DBM] error 100 : content=%s 参数错误.' % content)
+    else:
+        print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
+        sys.exit(1)
     #恢复约束
     mysql_target.mysql_target_execute('set foreign_key_checks=1')
 
@@ -291,7 +294,7 @@ def mysql_to_oracle():
     # mysql -> mysql 数据库级别同步
     if migrate_granularity == 'db':
         print("[DBM] error 999 : 目前Mysql->Oracle的异构数据库同步只支持表级别的数据同步(content='data')!")
-        exit(1)
+        sys.exit(1)
     elif migrate_granularity == 'table':
         # 只同步表数据
         if content == 'data':
@@ -304,7 +307,7 @@ def mysql_to_oracle():
                 to_table = from_table
                 if to_table in exist_table_list and table_exists_action == 'drop':
                     print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
-                    exit(1)
+                    sys.exit(1)
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
                     # truncate目标表
                     truncate_sql = 'truncate table ' + to_table
@@ -346,7 +349,11 @@ def mysql_to_oracle():
                 '''
         else:
             print("[DBM] error 999 : 目前Mysql->Oracle的异构数据库同步只支持表级别的数据同步(content='data')!")
-            exit(1)
+            sys.exit(1)
+    else:
+        print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
+        sys.exit(1)
+
 
 
 # 主程序
