@@ -381,7 +381,7 @@ if __name__ == '__main__':
     elif source_db_type == 'mysql' and target_db_type == 'oracle':
         mysql_to_oracle()
     end_time = time.time()
-    print('DBM同步完成,共耗时:' + str(end_time - begin_time) + 's')
+    print('DBM同步完成,共耗时:' + str(round(end_time - begin_time)) + 's')
 
 
 
