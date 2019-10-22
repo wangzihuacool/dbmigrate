@@ -49,11 +49,16 @@ def mysql_to_mysql():
 
                 # trigger同步
                 # to_do
-            #外键同步
+            # 外键同步
             final_fk = mysql_source.mysql_source_fk(from_tables)
             mysql_target.mysql_target_fk(final_fk)
+            # 视图同步
+            from_views_ddl, from_procedures, from_functions, from_routines, from_events = mysql_source.mysql_source_pkg()
+            if from_views_ddl:
+                for to_view, to_view_info in from_views_ddl.items():
+                    mysql_target.mysql_target_view(to_view, to_view_info)
 
-            #视图、存储过程，函数和routines同步
+            # 存储过程，函数和routines同步
             #to_db
 
         elif content == 'metadata':
@@ -77,7 +82,13 @@ def mysql_to_mysql():
             final_fk = mysql_source.mysql_source_fk(from_tables)
             mysql_target.mysql_target_fk(final_fk)
 
-            # 视图、存储过程，函数和routines同步
+            # 视图同步
+            from_views_ddl, from_procedures, from_functions, from_routines, from_events = mysql_source.mysql_source_pkg()
+            if from_views_ddl:
+                for to_view, to_view_info in from_views_ddl.items():
+                    mysql_target.mysql_target_view(to_view, to_view_info)
+
+            # 存储过程，函数和routines同步
             # to_db
 
         elif content == 'data':

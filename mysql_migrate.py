@@ -137,11 +137,18 @@ class MysqlSource(object):
 
     #获取源库的所有视图,存储过程，函数和routines
     def mysql_source_pkg(self):
+        # 获取源库的视图及其定义
         res_views = self.MysqlDb.mysql_select('select table_name, check_option, is_updatable, security_type, '
                                               'definer from information_schema.views where table_schema="%s" '
                                               'order by table_name asc' % self.from_db)
         from_views = [view[0] for view in res_views]
-        #获取源库的所有存储过程和函数和routines
+        from_views_ddl = {}
+        if from_views:
+            for from_view in from_views:
+                res_view = self.MysqlDb.mysql_select('show create view `%s`.`%s`' % (self.from_db, from_view))
+                from_views_ddl.setdefault(from_view, res_view)
+
+        # 获取源库的所有存储过程和函数和routines
         res_procedures = self.MysqlDb.mysql_select('show procedure status where db = "%s"' % self.from_db)
         from_procedures = [procedure[0] for procedure in res_procedures]
         res_functions = self.MysqlDb.mysql_select('show function status where db = "%s"' % self.from_db)
@@ -158,7 +165,7 @@ class MysqlSource(object):
                                                'where event_schema="%s" '
                                                'order by event_name asc' % self.from_db)
         from_events = [event[0] for event in res_events]
-        return from_views, from_procedures, from_functions, from_routines, from_events
+        return from_views_ddl, from_procedures, from_functions, from_routines, from_events
 
     def mysql_source_close(self):
         self.MysqlDb.close()
@@ -273,8 +280,13 @@ class MysqlTarget(object):
             #print(sql_fk)
             fk_rows = self.MysqlTargetDb.mysql_execute(sql_fk)
 
+    # 创建视图
+    def mysql_target_view(self, to_view, to_view_info):
+        print('[DBM] Create view `' + to_view + '`')
+        sql_view = 'create view `' + self.to_db + '`.`' + to_view + '` as ' + to_view_info[1].split('AS', 1)[1]
+        view_rows = self.MysqlTargetDb.mysql_execute(sql_view)
 
-    #传输数据到目标表
+    # 传输数据到目标表
     def insert_target_data(self, to_table, data):
         if data:
             str_list = ['%s' for i in range(len(data[0]))]
