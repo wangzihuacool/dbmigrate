@@ -379,7 +379,7 @@ class MysqlDataMigrate(object):
         sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '`'
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')
-        arraysize = 10000
+        arraysize = 100000
         res_data_incr = self.mysql_source.mysql_source_data_incr(sql_select, arraysize=arraysize)
         insert_rows_list = []
         while True:
