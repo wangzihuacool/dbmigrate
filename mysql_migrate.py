@@ -12,7 +12,7 @@ import threading
 import os, sys
 import math
 import copy
-from mysql_operate import MysqlOperate
+from mysql_operate import MysqlOperate, MysqlOperateIncr
 from oracle_migrate import OracleTarget
 from comm_decorator import performance, MyThread
 #import warnings
@@ -104,12 +104,7 @@ class MysqlSource(object):
         [index_column_info.append(i) for i in c if i not in index_column_info]
         return index_column_info
 
-    #全量获取源表数据
-    def mysql_source_data_incr(self, sql, arraysize=10000):
-        res_data_incr = self.MysqlDb.mysql_select_incr(sql, arraysize=arraysize)
-        return res_data_incr
-
-    #增量获取源表数据
+    # 全量获取源表数据
     def mysql_source_data(self, sql):
         res_data = self.MysqlDb.mysql_select(sql)
         return res_data
@@ -379,8 +374,11 @@ class MysqlDataMigrate(object):
         sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '`'
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')
+        # 串行获取数据时每批次获取数据量
         arraysize = 100000
-        res_data_incr = self.mysql_source.mysql_source_data_incr(sql_select, arraysize=arraysize)
+        # 使用MysqlOperateIncr子类分批获取数据，降低客户端内存压力和网络传输压力
+        mysql_source_incr = MysqlOperateIncr(**self.source_db_info)
+        res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)
         insert_rows_list = []
         while True:
             data_incr = next(res_data_incr)

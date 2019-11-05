@@ -23,34 +23,33 @@ class MysqlOperate(object):
         self.user = db_info.get('user')
         self.password = db_info.get('password')
         self.charset = 'utf8mb4' if not db_info.get('charset') else db_info.get('charset')
-        self.connection = pymysql.connect(host = self.host,
-                                          port = self.port,
-                                          db = self.db,
-                                          user = self.user,
-                                          password = self.password,
-                                          charset = self.charset)
+        self.connection = pymysql.connect(host=self.host,
+                                          port=self.port,
+                                          db=self.db,
+                                          user=self.user,
+                                          password=self.password,
+                                          charset=self.charset
+                                          )
 
-    #mysql查询语句
+    # mysql查询语句
     #@performance
     def mysql_select(self, sql):
         with self.connection.cursor() as conn_cursor:
-            conn_cursor.arraysize = 10000  # 设置一次批量获取的行数，对fetchall无效
             conn_cursor.execute(sql)
             results = conn_cursor.fetchall()
             return results
 
-    #mysql批量获取
+    # mysql批量获取 , 分批获取pymysql查询结果，需要选择cursorclass为pymysql.cursors.SSCursor
+    # 参考：https://pymysql.readthedocs.io/en/latest/modules/cursors.html#pymysql.cursors.SSCursor
     #@performance
-    def mysql_select_incr(self, sql, arraysize=10000):
+    def mysql_select_incr(self, sql, arraysize=100000):
         with self.connection.cursor() as conn_cursor:
-            conn_cursor.arraysize = arraysize  # 设置一次批量获取的行数，对fetchall无效
             conn_cursor.execute(sql)
             while True:
-                results = conn_cursor.fetchmany()
+                results = conn_cursor.fetchmany(size=arraysize)
                 yield results
-                if not results:
-                    break
-
+                #if not results:
+                #    break
 
     #带参数的mysql查询语句
     #@pysnooper.snoop()
@@ -121,6 +120,33 @@ class MysqlOperate(object):
     def close(self):
         self.connection.close()
 
+
+# mysql操作子类，用来分批获取数据(使用SSCursor非缓存式获取数据)
+class MysqlOperateIncr(MysqlOperate):
+    def __init__(self, **db_info):
+        self.host = db_info.get('host')
+        self.port = db_info.get('port')
+        self.db = db_info.get('db')
+        self.user = db_info.get('user')
+        self.password = db_info.get('password')
+        self.charset = 'utf8mb4' if not db_info.get('charset') else db_info.get('charset')
+        self.connection = pymysql.connect(host=self.host,
+                                          port=self.port,
+                                          db=self.db,
+                                          user=self.user,
+                                          password=self.password,
+                                          charset=self.charset,
+                                          cursorclass=pymysql.cursors.SSCursor)
+
+    # mysql批量获取 , 分批获取pymysql查询结果，需要选择cursorclass为pymysql.cursors.SSCursor
+    # 参考：https://pymysql.readthedocs.io/en/latest/modules/cursors.html#pymysql.cursors.SSCursor
+    # @performance
+    def mysql_select_incr(self, sql, arraysize=100000):
+        with self.connection.cursor() as conn_cursor:
+            conn_cursor.execute(sql)
+            while True:
+                results = conn_cursor.fetchmany(size=arraysize)
+                yield results
 
 
 
