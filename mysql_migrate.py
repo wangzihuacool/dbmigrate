@@ -20,7 +20,7 @@ from comm_decorator import performance, MyThread
 
 
 
-#源库为mysql时获取数据
+# 源库为mysql时获取数据
 class MysqlSource(object):
     # 检查源数据库连接
     def __init__(self, **source_db_info):
@@ -34,7 +34,7 @@ class MysqlSource(object):
             traceback.print_exc()
             sys.exit(1)
 
-    #检查源库是否存在
+    # 检查源库是否存在
     def source_db_check(self):
         res_db = self.MysqlDb.mysql_select('show databases')
         if self.from_db in [db[0] for db in res_db]:
@@ -43,7 +43,7 @@ class MysqlSource(object):
             print('[DBM] Error: Source db [' + self.from_db + '] not found.请确认!')
             sys.exit(1)
 
-    #检查配置文件中的表在源库是否存在，未配置则全部表同步
+    # 检查配置文件中的表在源库是否存在，未配置则全部表同步
     def source_table_check(self, *source_tables):
         res_tables = self.MysqlDb.mysql_select('show full tables from `%s` where table_type != "VIEW"' % self.from_db)
         all_table_list = [table[0] for table in res_tables]
@@ -60,7 +60,7 @@ class MysqlSource(object):
             migrate_granularity = 'db'
         return from_tables, migrate_granularity
 
-    #获取源表元数据
+    # 获取源表元数据
     def mysql_source_table(self, from_table):
         res_tablestatus = self.MysqlDb.execute_dict('show table status from `%s` like "%s"' % (self.from_db, from_table))
         res_createtable = self.MysqlDb.execute_dict('show create table `%s`.`%s`' % (self.from_db, from_table))
@@ -72,7 +72,7 @@ class MysqlSource(object):
                                                  'order by event_object_table' % (self.from_db, from_table))
         return res_tablestatus, res_createtable, res_columns, res_triggers
 
-    #获取源表索引(除去主键,主键跟表元数据一起)
+    # 获取源表索引(除去主键,主键跟表元数据一起)
     def mysql_source_index(self, from_table):
         res_indexes = self.MysqlDb.execute_dict('show index from `%s`.`%s`' % (self.from_db, from_table))
         # 对mysql返回的索引列表排序
@@ -106,6 +106,9 @@ class MysqlSource(object):
 
     # 全量获取源表数据
     def mysql_source_data(self, sql):
+        # 设置session级SQL最大执行时间为1小时
+        sql_max_exec_time = 'set max_execution_time=3600000'
+        self.MysqlDb.mysql_execute(sql_max_exec_time)
         res_data = self.MysqlDb.mysql_select(sql)
         return res_data
 
@@ -137,17 +140,34 @@ class MysqlSource(object):
                                               'definer from information_schema.views where table_schema="%s" '
                                               'order by table_name asc' % self.from_db)
         from_views = [view[0] for view in res_views]
+        from_views_tmp_ddl = {}
         from_views_ddl = {}
         if from_views:
             for from_view in from_views:
                 res_view = self.MysqlDb.mysql_select('show create view `%s`.`%s`' % (self.from_db, from_view))
-                from_views_ddl.setdefault(from_view, res_view)
+                view_tmp_defination = self.MysqlDb.mysql_select('show fields from `%s`.`%s`' % (self.from_db, from_view))
+                from_views_tmp_ddl.setdefault(from_view, view_tmp_defination)
+                from_views_ddl.setdefault(from_view, res_view[0])
 
-        # 获取源库的所有存储过程和函数和routines
+        # 获取源库的存储过程及其定义
         res_procedures = self.MysqlDb.mysql_select('show procedure status where db = "%s"' % self.from_db)
-        from_procedures = [procedure[0] for procedure in res_procedures]
+        from_procedures = [procedure[1] for procedure in res_procedures]
+        from_procedures_ddl = {}
+        if from_procedures:
+            for from_procedure in from_procedures:
+                res_procedure = self.MysqlDb.mysql_select('show create procedure `%s`.`%s`' % (self.from_db, from_procedure))
+                from_procedures_ddl.setdefault(from_procedure, res_procedure[0])
+
+        # 获取源库的函数及其定义
         res_functions = self.MysqlDb.mysql_select('show function status where db = "%s"' % self.from_db)
-        from_functions = [function[0] for function in res_functions]
+        from_functions = [f[1] for f in res_functions]
+        from_functions_ddl = {}
+        if from_functions:
+            for from_function in from_functions:
+                res_function = self.MysqlDb.mysql_select('show create function `%s`.`%s`' % (self.from_db, from_function))
+                from_functions_ddl.setdefault(from_function, res_function[0])
+
+        # routines(函数+存储过程) 和 event
         res_routines = self.MysqlDb.mysql_select('select * from information_schema.routines where routine_schema="%s" '
                                                  'order by routine_name' % self.from_db)
         from_routines = [routine[0] for routine in res_routines]
@@ -160,16 +180,15 @@ class MysqlSource(object):
                                                'where event_schema="%s" '
                                                'order by event_name asc' % self.from_db)
         from_events = [event[0] for event in res_events]
-        return from_views_ddl, from_procedures, from_functions, from_routines, from_events
+        return from_views_ddl, from_views_tmp_ddl, from_procedures_ddl, from_functions_ddl, from_routines, from_events
 
     def mysql_source_close(self):
         self.MysqlDb.close()
 
 
-
-#目标为mysql时写入数据
+# 目标为mysql时写入数据
 class MysqlTarget(object):
-    #检查目标库连接
+    # 检查目标库连接
     def __init__(self, **target_db_info):
         new_db_info = copy.deepcopy(target_db_info)
         new_db_info['db'] = None
@@ -183,7 +202,7 @@ class MysqlTarget(object):
             traceback.print_exc()
             sys.exit(1)
 
-    #创建目标数据库
+    # 创建目标数据库
     def mysql_target_createdb(self, migrate_granularity):
         res_db = self.MysqlTargetDb.mysql_select('show databases')
         if self.to_db in [db[0] for db in res_db] and migrate_granularity == 'db':
@@ -194,13 +213,13 @@ class MysqlTarget(object):
         else:
             self.MysqlTargetDb.mysql_execute('create database if not exists %s' % self.to_db)
 
-    #检查目标库已存在的表
+    # 检查目标库已存在的表
     def mysql_target_exist_tables(self):
         res_tables = self.MysqlTargetDb.mysql_select('show full tables from `%s` where table_type != "VIEW"' % self.to_db)
         all_table_list = [table[0] for table in res_tables]
         return all_table_list
 
-    #目标库创建表
+    # 目标库创建表
     def mysql_target_table(self, to_table, table_exists_action, res_columns=None, res_tablestatus=None):
         self.MysqlTargetDb.mysql_execute('use %s' % self.to_db)
         #处理列信息
@@ -227,11 +246,11 @@ class MysqlTarget(object):
             all_columns_defination = all_columns_defination + column_defination
         all_columns_defination_1 = all_columns_defination.strip(",")
 
-        #处理主键信息
+        # 处理主键信息
         pri_key_col = [('`' + row.get('field') + '`') for row in res_columns if row.get('key') == 'PRI' or row.get('key') == 'pri']
         pri_key_defination = (' primary key (' + ", ".join(pri_key_col) + ')') if pri_key_col else ''
 
-        #处理表默认属性
+        # 处理表默认属性
         engine_defination = 'engine=' + res_tablestatus[0].get('engine', 'InnoDB')
         default_charset_defination = ('default charset=' + res_tablestatus[0].get('collation').split('_')[0]) if res_tablestatus[0].get('collation') else ''
         default_collation_defination = ('collate=' + res_tablestatus[0].get('collation')) if res_tablestatus[0].get('collation') else ''
@@ -240,17 +259,17 @@ class MysqlTarget(object):
         all_default_defination = engine_defination + ' ' + default_charset_defination + ' ' + \
                                  default_collation_defination + ' ' + create_options_defination + ' ' + default_comment_defination
 
-        #创建目标表
+        # 创建目标表
         if pri_key_defination:
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination + pri_key_defination + ')' + all_default_defination
         else:
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination_1 + ')' + all_default_defination
-        #print(sql_table_defination)
+        # print(sql_table_defination)
         print('[DBM] Create table `' + to_table + '`')
         table_rows = self.MysqlTargetDb.mysql_execute(sql_table_defination)
 
-    #创建索引
-    #@performance
+    # 创建索引
+    # @performance
     def msyql_target_index(self, to_table, index_column_info):
         print('[DBM] Create index on table `' + to_table + '`')
         all_indexes_defination = []
@@ -261,9 +280,9 @@ class MysqlTarget(object):
                 sql_index = 'alter table `' + self.to_db + '`.`' + j.get('table') + '` add index ' + j.get('key_name') + '(' + j.get('column_name') + ')'
             all_indexes_defination.append(sql_index)
             index_rows = self.MysqlTargetDb.mysql_execute(sql_index)
-        #print(all_indexes_defination)
+        # print(all_indexes_defination)
 
-    #创建外键
+    # 创建外键
     def mysql_target_fk(self, final_fk):
         for final_fk_record in final_fk:
             # 外键对应表所在schema为to_db
@@ -276,10 +295,46 @@ class MysqlTarget(object):
             fk_rows = self.MysqlTargetDb.mysql_execute(sql_fk)
 
     # 创建视图
-    def mysql_target_view(self, to_view, to_view_info):
-        print('[DBM] Create view `' + to_view + '`')
-        sql_view = 'create view `' + self.to_db + '`.`' + to_view + '` as ' + to_view_info[1].split('AS', 1)[1]
-        view_rows = self.MysqlTargetDb.mysql_execute(sql_view)
+    def mysql_target_view(self, to_views_ddl):
+        for to_view, to_view_ddl in to_views_ddl.items():
+            print('[DBM] Create view `' + to_view + '`')
+            sql_drop_view = 'drop table if exists `' + self.to_db + '`.`' + to_view + '`'
+            sql_view = 'create view `' + self.to_db + '`.`' + to_view + '` as ' + to_view_ddl[1].split('AS', 1)[1]
+            view_drop_rows = self.MysqlTargetDb.mysql_execute(sql_drop_view)
+            view_rows = self.MysqlTargetDb.mysql_execute(sql_view)
+
+    # 先创建所有视图同名的临时表，解决视图创建时依赖的视图不存在的问题
+    def mysql_target_view_tmp(self, to_views_tmp_ddl):
+        for to_view, to_view_ddl in to_views_tmp_ddl.items():
+            fields_defination = ['`' + field[0] + '` tinyint not null' for field in to_view_ddl]
+            sql_view_tmp = 'create table `' + self.to_db + '`.`' + to_view + '` (' + ','.join(fields_defination) + ') engine=myisam'
+            view_tmp_rows = self.MysqlTargetDb.mysql_execute(sql_view_tmp)
+
+    # 创建存储过程
+    def mysql_target_procedure(self, to_procedures_ddl):
+        for to_procedure, to_procedure_ddl in to_procedures_ddl.items():
+            print('[DBM] Create procedure `' + to_procedure + '`')
+            sql_procedure = 'create procedure `' + self.to_db + '`.' + to_procedure_ddl[2].split('PROCEDURE', 1)[1]
+            procedure_rows = self.MysqlTargetDb.mysql_execute(sql_procedure)
+
+    # 创建函数(set global log_bin_trust_function_creators=on 允许创建函数，需要super权限)
+    def mysql_target_function(self, to_functions_ddl):
+        sql_show_variable = "show variables like 'log_bin_trust_function_creators'"
+        res_variable = self.MysqlTargetDb.mysql_select(sql_show_variable)
+        if res_variable[0][1] == 'OFF':
+            sql_variable = 'set global log_bin_trust_function_creators=on'
+            variable_rows = self.MysqlTargetDb.mysql_execute(sql_variable)
+            for to_function, to_function_ddl in to_functions_ddl.items():
+                print('[DBM] Create function `' + to_function + '`')
+                sql_function = 'create  function `' + self.to_db + '`.' + to_function_ddl[2].split('FUNCTION', 1)[1]
+                function_rows = self.MysqlTargetDb.mysql_execute(sql_function)
+            sql_variable = 'set global log_bin_trust_function_creators=off'
+            variable_rows = self.MysqlTargetDb.mysql_execute(sql_variable)
+        else:
+            for to_function, to_function_ddl in to_functions_ddl.items():
+                print('[DBM] Create function `' + to_function + '`')
+                sql_function = 'create  function `' + self.to_db + '`.' + to_function_ddl[2].split('FUNCTION', 1)[1]
+                function_rows = self.MysqlTargetDb.mysql_execute(sql_function)
 
     # 传输数据到目标表
     def insert_target_data(self, to_table, data):
@@ -306,7 +361,6 @@ class MysqlTarget(object):
 
     def mysql_target_close(self):
         self.MysqlTargetDb.close()
-
 
 
 # 源库是mysql时的查询和目标库插入方法(for 并行同步)
@@ -374,10 +428,13 @@ class MysqlDataMigrate(object):
         sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '`'
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')
-        # 串行获取数据时每批次获取数据量
-        arraysize = 100000
         # 使用MysqlOperateIncr子类分批获取数据，降低客户端内存压力和网络传输压力
         mysql_source_incr = MysqlOperateIncr(**self.source_db_info)
+        # 串行获取数据时每批次获取数据量
+        arraysize = 100000
+        # 设置session级SQL最大执行时间为1小时
+        sql_max_exec_time = 'set max_execution_time=3600000'
+        mysql_source_incr.mysql_execute(sql_max_exec_time)
         res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)
         insert_rows_list = []
         while True:
@@ -392,15 +449,15 @@ class MysqlDataMigrate(object):
 
     # 源库是mysql时的数据同步的并行处理方法
     def mysql_parallel_migrate(self, from_table, to_table, final_parallel, parallel_key=None, parallel_method='multiprocess'):
-        #分批数据
+        # 分批数据
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
-        #Mysql_Operate = MysqlSourceTarget(self.source_db_info, self.target_db_info)
+        # Mysql_Operate = MysqlSourceTarget(self.source_db_info, self.target_db_info)
         sql_max_min = 'select max(`' + parallel_key + '`), min(`' + parallel_key + '`) from `' + from_db + '`.`' + from_table + '`'
         res_max_min = self.mysql_source.mysql_source_data(sql_max_min)
         max_key = res_max_min[0][0]
         min_key = res_max_min[0][1]
-        #per_rows为每进程处理的数据量
+        # per_rows为每进程处理的数据量
         per_rows = math.ceil((max_key - min_key + 1)/final_parallel)
 
         #源库select语句

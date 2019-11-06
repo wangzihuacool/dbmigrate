@@ -28,8 +28,8 @@ class MysqlOperate(object):
                                           db=self.db,
                                           user=self.user,
                                           password=self.password,
-                                          charset=self.charset
-                                          )
+                                          charset=self.charset,
+                                          read_timeout=None)
 
     # mysql查询语句
     #@performance

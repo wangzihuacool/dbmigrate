@@ -52,14 +52,15 @@ def mysql_to_mysql():
             # 外键同步
             final_fk = mysql_source.mysql_source_fk(from_tables)
             mysql_target.mysql_target_fk(final_fk)
-            # 视图同步
-            from_views_ddl, from_procedures, from_functions, from_routines, from_events = mysql_source.mysql_source_pkg()
+            # 视图同步, 存储过程同步, 函数同步
+            from_views_ddl, from_views_tmp_ddl, from_procedures_ddl, from_functions_ddl, from_routines, from_events = mysql_source.mysql_source_pkg()
             if from_views_ddl:
-                for to_view, to_view_info in from_views_ddl.items():
-                    mysql_target.mysql_target_view(to_view, to_view_info)
-
-            # 存储过程，函数和routines同步
-            #to_db
+                mysql_target.mysql_target_view_tmp(from_views_tmp_ddl)
+                mysql_target.mysql_target_view(from_views_ddl)
+            if from_procedures_ddl:
+                mysql_target.mysql_target_procedure(from_procedures_ddl)
+            if from_functions_ddl:
+                mysql_target.mysql_target_procedure(from_functions_ddl)
 
         elif content == 'metadata':
             # 表同步
@@ -82,14 +83,17 @@ def mysql_to_mysql():
             final_fk = mysql_source.mysql_source_fk(from_tables)
             mysql_target.mysql_target_fk(final_fk)
 
-            # 视图同步
-            from_views_ddl, from_procedures, from_functions, from_routines, from_events = mysql_source.mysql_source_pkg()
+            # 视图同步, 存储过程同步, 函数同步
+            # 视图同步时为解决视图间存在依赖关系导致创建视图顺序无法确定的问题，先创建跟视图同名的临时表，然后删除临时表创建视图，解决创建视图时表不存在的问题。
+            # 视图同步方式参考mysqldump的处理方法。
+            from_views_ddl, from_views_tmp_ddl, from_procedures_ddl, from_functions_ddl, from_routines, from_events = mysql_source.mysql_source_pkg()
             if from_views_ddl:
-                for to_view, to_view_info in from_views_ddl.items():
-                    mysql_target.mysql_target_view(to_view, to_view_info)
-
-            # 存储过程，函数和routines同步
-            # to_db
+                mysql_target.mysql_target_view_tmp(from_views_tmp_ddl)
+                mysql_target.mysql_target_view(from_views_ddl)
+            if from_procedures_ddl:
+                mysql_target.mysql_target_procedure(from_procedures_ddl)
+            if from_functions_ddl:
+                mysql_target.mysql_target_function(from_functions_ddl)
 
         elif content == 'data':
             print('[DBM] error 100 : 参数错误，content=\'data\' 仅适用于表同步.')
