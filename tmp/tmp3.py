@@ -1,11 +1,11 @@
 import pymysql
 
 def mysql_select_incr():
-    connection = pymysql.connect(host='172.20.221.195',
+    connection = pymysql.connect(host='172.20.xx.xx',
                                  port=3306,
                                  db='sbench',
-                                 user='root',
-                                 password='root',
+                                 user='test',
+                                 password='test',
                                  charset='utf8')
 
     sql = 'select * from test2'

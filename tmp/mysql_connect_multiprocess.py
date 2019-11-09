@@ -12,11 +12,11 @@ import traceback
 
 
 #mysql数据库信息
-mysql_host = '172.20.221.194'
+mysql_host = '172.20.xx.xx'
 mysql_port = 3306
 mysql_db = 'sbench'
-mysql_user = 'root'
-mysql_password = 'root'
+mysql_user = 'test'
+mysql_password = 'test'
 
 #测试SQL语句
 SQL_DROP_TABLE = """
