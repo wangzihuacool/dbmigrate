@@ -243,7 +243,7 @@ class OracleTarget(object):
           from user_constraints 
          where constraint_type = 'R' and status = 'ENABLED' and table_name in ('{TABLE_LIST}')
         """
-        print(sql_constraint.format(TABLE_LIST=table_list))
+        # print(sql_constraint.format(TABLE_LIST=table_list))
         res_enabled_constraints = self.OracleTargetConn.execute_dict(sql_constraint.format(TABLE_LIST=table_list))
         sql_disable_constraints = [
             'alter table ' + i.get('table_name') + ' disable constraint ' + i.get('constraint_name') for i in
