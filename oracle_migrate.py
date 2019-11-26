@@ -26,6 +26,7 @@ class OracleSource(object):
         self.username = source_db_info.get('user')
         self.password = source_db_info.get('password')
         self.charset = source_db_info.get('charset')
+        self.from_db = source_db_info.get('db')
         try:
             self.OracleSourceConn = DbOperate(self.hostname, self.port, self.username, self.password,
                                               service_name=self.service_name)
