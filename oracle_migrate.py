@@ -13,7 +13,6 @@ import os, sys
 import math
 import copy
 from db_operate import DbOperate
-from mysql_migrate import MysqlTarget
 from comm_decorator import performance, MyThread
 
 
@@ -79,13 +78,13 @@ class OracleSource(object):
                                                           "from user_triggers "
                                                           "where base_object_type='TABLE' "
                                                           "and table_name = upper('{TABLE_NAME}')".format(TABLE_NAME=from_table))
-        res_segments = self.OracleSourceConn.execute_dict("select lower(s.segment_name) as table_name, "
-                                                          "max(t.num_rows) as num_rows, sum(s.bytes) as data_length "
-                                                          "from user_segments s, user_tables t"
-                                                          "where s.segment_name = t.table_name"
-                                                          "and segment_name not like 'BIN$%'"
-                                                          "and segment_name = upper('{TABLE_NAME}')"
-                                                          "group by segment_name ".format(TABLE_NAME=from_table))
+        res_segments = self.OracleSourceConn.execute_dict("select lower(t.table_name) as table_name, "
+                                                          "max(t.num_rows) as num_rows, "
+                                                          "decode(sum(s.bytes),null,0,sum(s.bytes)) as data_length "
+                                                          "from user_segments s, user_tables t "
+                                                          "where s.segment_name(+) = t.table_name "
+                                                          "and t.table_name = upper('{TABLE_NAME}') "
+                                                          "group by t.table_name".format(TABLE_NAME=from_table))
         return res_tablestatus, res_partitions, res_columns, res_triggers, res_segments
 
     # 获取源表索引(包括主键对应的索引)
@@ -263,6 +262,8 @@ def oracle_select_insert(sql_info, source_db_info, target_db_info):
     # 判断目标数据库类型，根据不同类型调用不同的插入方法(不同类型数据库的插入方法名保持一致)
     target_db_type = target_db_info.get('target_db_type')
     if target_db_type == 'mysql':
+        # 使用时引用，避免交叉引用
+        from mysql_migrate import MysqlTarget
         multi_db_target = MysqlTarget(**target_db_info)
     elif target_db_type == 'oracle':
         multi_db_target = OracleTarget(**target_db_info)
@@ -307,6 +308,7 @@ class OracleDataMigrate(object):
         # 判断目标数据库类型，根据不同类型调用不同的插入方法(不同类型数据库的插入方法名保持一致)
         self.target_db_type = target_db_info.get('target_db_type')
         if self.target_db_type == 'mysql':
+            from mysql_migrate import MysqlTarget
             self.multi_db_target = MysqlTarget(**target_db_info)
         elif self.target_db_type == 'oracle':
             self.multi_db_target = OracleTarget(**target_db_info)

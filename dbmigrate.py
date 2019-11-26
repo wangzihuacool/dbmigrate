@@ -367,6 +367,7 @@ def mysql_to_oracle():
         print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
         sys.exit(1)
 
+
 # oracle -> oracle 数据库同步
 def oracle_to_oracle():
     # 检查源库oracle和目标库oracle, 检查源表是否存在
@@ -384,7 +385,7 @@ def oracle_to_oracle():
         if content == 'data':
             for from_table in from_tables:
                 from_table = from_table.lower()
-                res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table()
+                res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table(from_table)
                 index_column_info = oracle_source.oracle_source_index(from_table)
                 # 检查目标表是否已存在
                 exist_table_list = oracle_target.oracle_target_exist_tables()
@@ -446,7 +447,7 @@ if __name__ == '__main__':
     target_db_info = {'host': target_host, 'port': target_port, 'db': target_db, 'user': target_user,
                       'password': target_password, 'charset': 'utf8', 'target_db_type': target_db_type}
 
-    #判断同步粒度
+    # 判断同步粒度
     if source_tables:
         migrate_granularity = 'table'
     else:
@@ -457,6 +458,8 @@ if __name__ == '__main__':
         mysql_to_mysql()
     elif source_db_type == 'mysql' and target_db_type == 'oracle':
         mysql_to_oracle()
+    elif source_db_type == 'oracle' and target_db_type == 'oracle':
+        oracle_to_oracle()
     end_time = time.time()
     print('DBM同步完成,共耗时:' + str(round(end_time - begin_time)) + 's')
 

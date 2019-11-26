@@ -110,7 +110,7 @@ class DbOperate(object):
         # self.cursor.arraysize = 10000  # 设置一次批量获取的行数
         self.cursor.execute(sql)
         while True:
-            results = self.cursor.fetchmany(size=arraysize)
+            results = self.cursor.fetchmany(numRows=arraysize)
             yield results
 
     def insertbatch(self, sql, params):
