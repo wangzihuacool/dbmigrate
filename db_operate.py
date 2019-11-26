@@ -97,15 +97,21 @@ class DbOperate(object):
         #返回connection对象
         return DbOperate.__ConnPool.acquire()
 
-
     def get_db_cursor(self):
         return self.cursor
 
     def execute(self, sql):
-        self.cursor.arraysize = 10000  # 设置一次批量获取的行数, 对fetchall无效
         self.cursor.execute(sql)
         results = self.cursor.fetchall()
         return results
+
+    # @performance
+    def oracle_select_incr(self, sql, arraysize=100000):
+        # self.cursor.arraysize = 10000  # 设置一次批量获取的行数
+        self.cursor.execute(sql)
+        while True:
+            results = self.cursor.fetchmany(size=arraysize)
+            yield results
 
     def insertbatch(self, sql, params):
         self.conn.begin()

@@ -101,10 +101,17 @@ class DbOperate(object):
         return self.cursor
 
     def execute(self, sql):
-        self.cursor.arraysize = 10000  # 设置一次批量获取的行数
         self.cursor.execute(sql)
         results = self.cursor.fetchall()
         return results
+
+    # @performance
+    def oracle_select_incr(self, sql, arraysize=100000):
+        self.cursor.arraysize = 10000  # 设置一次批量获取的行数
+        self.cursor.execute(sql)
+        while True:
+            results = self.cursor.fetchmany(size=arraysize)
+            yield results
 
     def insertbatch(self, sql, params, arraydmlrowcounts=True):
         self.conn.begin()

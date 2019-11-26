@@ -19,3 +19,7 @@ show create database `tpcd`;
 9、外键增加 on delete 。。。 on update 。。。操作短句(done)
 
 10、对于drds这种不支持事务的数据库适配
+
+11、oracle数据库之间，oracle->mysql的数据同步
+
+12、oracle数据库之间和oracle到其他数据库的元数据同步

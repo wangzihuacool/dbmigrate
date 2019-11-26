@@ -7,7 +7,7 @@ import traceback
 import time, sys
 from env import *
 from mysql_migrate import MysqlSource, MysqlTarget, MysqlDataMigrate
-from oracle_migrate import OracleTarget
+from oracle_migrate import OracleSource, OracleTarget, OracleDataMigrate
 
 
 # mysql -> mysql 数据库同步
@@ -367,6 +367,68 @@ def mysql_to_oracle():
         print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
         sys.exit(1)
 
+# oracle -> oracle 数据库同步
+def oracle_to_oracle():
+    # 检查源库oracle和目标库oracle, 检查源表是否存在
+    oracle_source = OracleSource(**source_db_info)
+    oracle_target = OracleTarget(**target_db_info)
+    from_tables, migrate_granularity = oracle_source.source_table_check(*source_tables)
+    target_tables = from_tables
+
+    # oracle -> oracle 数据库级别同步
+    if migrate_granularity == 'db':
+        print("[DBM] error 999 : 目前Oracle->Oracle的数据库同步只支持表级别的数据同步(content='data')!")
+        sys.exit(1)
+    elif migrate_granularity == 'table':
+        # 只同步表数据
+        if content == 'data':
+            for from_table in from_tables:
+                from_table = from_table.lower()
+                res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table()
+                index_column_info = oracle_source.oracle_source_index(from_table)
+                # 检查目标表是否已存在
+                exist_table_list = oracle_target.oracle_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # 先truncate目标表，然后追加数据
+                    truncate_sql = 'truncate table ' + to_table
+                    oracle_target.oracle_execute_dml(truncate_sql)
+                    # 同步数据, 源库是oracle，执行OracleDataMigrate
+                    oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = oracle_dbm.oracle_parallel_flag(
+                        from_table, index_column_info, res_columns, res_segments, parallel=0)
+                    if parallel_flag == 0:
+                        total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
+                    else:
+                        total_rows = oracle_dbm.oracle_parallel_migrate(from_table, to_table, final_parallel,
+                                                                        parallel_key=parallel_key,
+                                                                        parallel_method=parallel_method)
+                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 数据追加到目标表
+                    oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = oracle_dbm.oracle_parallel_flag(
+                        from_table, index_column_info, res_columns, res_segments, parallel=0)
+                    if parallel_flag == 0:
+                        total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
+                    else:
+                        total_rows = oracle_dbm.oracle_parallel_migrate(from_table, to_table, final_parallel,
+                                                                        parallel_key=parallel_key,
+                                                                        parallel_method=parallel_method)
+                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+        else:
+            print("[DBM] error 999 : 目前Oracle->Oracle的数据库同步只支持表级别的数据同步(content='data')!")
+            sys.exit(1)
+    else:
+        print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
+        sys.exit(1)
 
 
 # 主程序
