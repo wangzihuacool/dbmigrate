@@ -237,12 +237,13 @@ class OracleTarget(object):
 
     # 同步数据前目标数据库禁用外键
     def oracle_disable_constraint(self, to_tables):
-        table_list = "','".join(to_tables)
+        table_list = "','".join(to_tables).upper()
         sql_constraint = """
         select lower(table_name) as table_name, lower(constraint_name) as constraint_name
           from user_constraints 
          where constraint_type = 'R' and status = 'ENABLED' and table_name in ('{TABLE_LIST}')
         """
+        print(sql_constraint.format(TABLE_LIST=table_list))
         res_enabled_constraints = self.OracleTargetConn.execute_dict(sql_constraint.format(TABLE_LIST=table_list))
         sql_disable_constraints = [
             'alter table ' + i.get('table_name') + ' disable constraint ' + i.get('constraint_name') for i in
