@@ -235,6 +235,30 @@ class OracleTarget(object):
         all_table_list = [table[0] for table in res_tables]
         return all_table_list
 
+    # 同步数据前目标数据库禁用外键
+    def oracle_disable_constraint(self, to_tables):
+        table_list = "','".join(to_tables)
+        sql_constraint = """
+        select lower(table_name) as table_name, lower(constraint_name) as constraint_name
+          from user_constraints 
+         where constraint_type = 'R' and status = 'ENABLED' and table_name in ('{TABLE_LIST}')
+        """
+        res_enabled_constraints = self.OracleTargetConn.execute_dict(sql_constraint.format(TABLE_LIST=table_list))
+        sql_disable_constraints = [
+            'alter table ' + i.get('table_name') + ' disable constraint ' + i.get('constraint_name') for i in
+            res_enabled_constraints] if res_enabled_constraints else []
+        for sql in sql_disable_constraints:
+            self.OracleTargetConn.executedml(sql)
+        sql_enable_constraints = [
+            'alter table ' + i.get('table_name') + ' enable constraint ' + i.get('constraint_name') for i in
+            res_enabled_constraints] if res_enabled_constraints else []
+        return sql_enable_constraints
+
+    # 同步数据后目标数据库启用外键
+    def oracle_enable_constraint(self, sql_enable_constraints):
+        for sql in sql_enable_constraints:
+            self.OracleTargetConn.executedml(sql)
+
     # 传输数据到目标表
     def insert_target_data(self, to_table, data):
         if data:
@@ -257,7 +281,7 @@ class OracleTarget(object):
         self.OracleTargetConn.close()
 
 
-# 源库是mysql时的查询和目标库插入方法(for 并行同步)
+# 源库是oracle时的查询和目标库插入方法(for 并行同步)
 def oracle_select_insert(sql_info, source_db_info, target_db_info):
     oracle_source = OracleSource(**source_db_info)
     # 判断目标数据库类型，根据不同类型调用不同的插入方法(不同类型数据库的插入方法名保持一致)
@@ -386,7 +410,7 @@ class OracleDataMigrate(object):
         for i in index_column_info:
             pri_col = i.get('column_name') if i.get('non_unique') == 0 else None
             col_list = list(filter(lambda x: x.get('column_name') == pri_col and x.get('nullable') == 'N' and x.get('data_type') == 'NUMBER', res_columns))
-            pri_keys.append(col_list[0].get('column_name'))
+            pri_keys.append(col_list[0].get('column_name')) if col_list else None
         if (res_segments[0].get('num_rows') > 100000 or res_segments[0].get('data_length') > 100000000) and pri_keys:
             # 并行主键
             parallel_key = pri_keys[0]

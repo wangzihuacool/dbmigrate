@@ -374,7 +374,7 @@ def oracle_to_oracle():
     oracle_source = OracleSource(**source_db_info)
     oracle_target = OracleTarget(**target_db_info)
     from_tables, migrate_granularity = oracle_source.source_table_check(*source_tables)
-    target_tables = from_tables
+    to_tables = from_tables
 
     # oracle -> oracle 数据库级别同步
     if migrate_granularity == 'db':
@@ -383,6 +383,8 @@ def oracle_to_oracle():
     elif migrate_granularity == 'table':
         # 只同步表数据
         if content == 'data':
+            # 同步数据前禁用外键
+            sql_enable_constraints = oracle_target.oracle_disable_constraint(to_tables)
             for from_table in from_tables:
                 from_table = from_table.lower()
                 res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table(from_table)
@@ -424,6 +426,8 @@ def oracle_to_oracle():
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+            # 同步后启用外键
+            oracle_target.oracle_enable_constraint(sql_enable_constraints)
         else:
             print("[DBM] error 999 : 目前Oracle->Oracle的数据库同步只支持表级别的数据同步(content='data')!")
             sys.exit(1)
