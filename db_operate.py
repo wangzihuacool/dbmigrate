@@ -3,9 +3,10 @@
 
 import sys
 import cx_Oracle
+import traceback
 
 
-#数据库操作类
+# 数据库操作类
 class DbOperate(object):
 
     #定义连接池对象,__ConnPool为类变量，整个类里面可以共用，调用时需加上类名
@@ -103,20 +104,39 @@ class DbOperate(object):
     def execute(self, sql):
         self.cursor.execute(sql)
         results = self.cursor.fetchall()
+        # 判断结果集是否包含lob字段，包含lob字段的返回结果集
+        if any(x[1] == cx_Oracle.CLOB or x[1] == cx_Oracle.BLOB for x in self.cursor.description):
+            results = [tuple([(c.read() if type(c) == cx_Oracle.LOB else c) for c in r]) for r in results]
         return results
 
     # @performance
     def oracle_select_incr(self, sql, arraysize=100000):
         # self.cursor.arraysize = 10000  # 设置一次批量获取的行数
         self.cursor.execute(sql)
-        while True:
-            results = self.cursor.fetchmany(numRows=arraysize)
-            yield results
+        # 判断结果集是否包含lob字段，包含lob字段的增量返回结果集
+        if any(x[1] == cx_Oracle.CLOB or x[1] == cx_Oracle.BLOB for x in self.cursor.description):
+            while True:
+                num_rows = int(arraysize/1000)
+                mid_results = self.cursor.fetchmany(numRows=num_rows)
+                results = [tuple([(c.read() if type(c) == cx_Oracle.LOB else c) for c in r]) for r in mid_results]
+                yield results
+
+        # 无lob字段时的增量返回结果集
+        else:
+            while True:
+                results = self.cursor.fetchmany(numRows=arraysize)
+                yield results
 
     def insertbatch(self, sql, params):
         self.conn.begin()
-        self.cursor.executemany(sql, params, arraydmlrowcounts=True)
-        self.conn.commit()
+        try:
+            self.cursor.executemany(sql, params, arraydmlrowcounts=True, batcherrors=True)
+            for error in self.cursor.getbatcherrors():
+                print("Insert batch Error:", error.message, ",at row offset:", error.offset,",error.code:", error.code, ",error.context:", error.context)
+            self.conn.commit()
+        except Exception as e:
+            traceback.print_exc()
+            self.conn.rollback()
         numrows = self.cursor.rowcount
         return numrows
 
@@ -140,17 +160,26 @@ class DbOperate(object):
 
     #定义返回lob类型字段的fetchall方法
     def _fetchall(self):
-        if any(x[1] == cx_Oracle.CLOB for x in self.cursor.description):
+        if any(x[1] == cx_Oracle.CLOB or x[1] == cx_Oracle.BLOB for x in self.cursor.description):
             return [tuple([(c.read() if type(c) == cx_Oracle.LOB else c) \
                            for c in r]) for r in self.cursor]
         else:
             return self.cursor.fetchall()
 
-    #返回LOB字段的结果集
+    #返回LOB字段的全部结果集
     def execute_lob(self, sql):
         self.cursor.execute(sql)
         results = self._fetchall()
         return results
+
+    # 增量返回lob字段的结果集
+    def oracle_lob_select_incr(self, sql, arraysize=100):
+        all_results = self.execute_lob(sql)
+        i, size = 0, arraysize
+        while i < len(all_results):
+            results = all_results[i:i+size]
+            yield results
+            i += size
 
     def close(self):
         self.cursor.close()
@@ -162,6 +191,18 @@ class DbOperate(object):
         #if self.session_pool:
         #    self.cursor.close()
         #    DbOperate.__ConnPool.release(self.conn)
+
+    # for blob insert测试
+    #binary_var = self.cursor.var(cx_Oracle.BLOB, arraysize=10000)
+    #data = []
+    #for row in params:
+    #    r = list(row)
+    #    for key, col in enumerate(r):
+    #        if isinstance(col, bytes):
+    #            binary_var.setvalue(0, col)
+    #            r[key] = binary_var
+    #    new_row = tuple(r)
+    #    data.append(new_row)
 
 
 class DbMonitor(object):

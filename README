@@ -1,0 +1,4 @@
+1、工具支持Mysql和Oralce间的数据库同步
+2、工具支持CLOB和BLOB数据类型的同步
+3、Oracle数据库同步功能需要安装Oracle客户端
+4、工具暂不支持XMLTYPE数据类型的同步

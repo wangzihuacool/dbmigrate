@@ -79,13 +79,23 @@ class OracleSource(object):
                                                           "from user_triggers "
                                                           "where base_object_type='TABLE' "
                                                           "and table_name = upper('{TABLE_NAME}')".format(TABLE_NAME=from_table))
-        res_segments = self.OracleSourceConn.execute_dict("select lower(t.table_name) as table_name, "
-                                                          "max(t.num_rows) as num_rows, "
-                                                          "decode(sum(s.bytes),null,0,sum(s.bytes)) as data_length "
+        res_segments = self.OracleSourceConn.execute_dict("select lower(t1.table_name) as table_name, "
+                                                          "t1.num_rows as num_rows, "
+                                                          "t1.data_length + decode(t2.data_length, null, 0, t2.data_length) as data_length "
+                                                          "from (select t.table_name as table_name, "
+                                                          "decode(max(t.num_rows), null, 0, max(t.num_rows)) as num_rows, "
+                                                          "decode(sum(s.bytes), null, 0, sum(s.bytes)) as data_length "
                                                           "from user_segments s, user_tables t "
                                                           "where s.segment_name(+) = t.table_name "
                                                           "and t.table_name = upper('{TABLE_NAME}') "
-                                                          "group by t.table_name".format(TABLE_NAME=from_table))
+                                                          "group by t.table_name) t1, "
+                                                          "(select max(l.table_name) as table_name, "
+                                                          "sum(s.bytes) as data_length "
+                                                          "from user_lobs l, user_segments s "
+                                                          "where l.segment_name = s.segment_name "
+                                                          "and l.table_name = upper('{TABLE_NAME}') "
+                                                          "group by s.segment_name) t2 "
+                                                          "where t1.table_name = t2.table_name(+)".format(TABLE_NAME=from_table))
         return res_tablestatus, res_partitions, res_columns, res_triggers, res_segments
 
     # 获取源表索引(包括主键对应的索引)
@@ -269,6 +279,7 @@ class OracleTarget(object):
             # cx-Oracle调用executemany插入时需要数据集为元祖组成的list
             data = list(data) if not isinstance(data, list) else data
             data_rows = self.OracleTargetConn.insertbatch(insert_sql, data)
+            # data_rows = self.OracleTargetConn.insert_clob(insert_sql, data)
             return data_rows
         else:
             return 0
@@ -303,17 +314,18 @@ def oracle_select_insert(sql_info, source_db_info, target_db_info):
     from_rowid = sql_info.get('from_rowid')
     to_rowid = sql_info.get('to_rowid')
     max_key = sql_info.get('max_key')
-    # 每进程每次同步10w行记录，分批循环处理
-    batch_rows = 100000
+    lob_flag = sql_info.get('lob_flag')
+    # 每进程每次同步10w行记录，分批循环处理; 如果存在lob字段则每批次同步50行 -- modified at 20191204
+    batch_rows = 100000 if lob_flag == 0 else 10
     batch_num = math.ceil((to_rowid - from_rowid)/batch_rows)
     # 每进程内最大循环批次为100，超过100时则增加每次同步记录数 --modified at 20191009
-    if batch_num > 100:
+    if batch_num > 100 and lob_flag == 0:
         batch_num = 100
         batch_rows = math.ceil((to_rowid - from_rowid)/100)
     insert_rows_list = []
     for b in range(batch_num):
         batch_from = from_rowid + (b * batch_rows)
-        batch_to = to_rowid if (b == batch_num -1) else (from_rowid + ((b + 1) * batch_rows))
+        batch_to = to_rowid if (b == batch_num - 1) else (from_rowid + ((b + 1) * batch_rows))
         if batch_to >= max_key:
             sql_select = 'select * from ' + from_table + ' where ' + parallel_key + ' >= ' + str(batch_from) + ' and ' + parallel_key + ' <= ' + str(max_key)
         else:
@@ -359,7 +371,7 @@ class OracleDataMigrate(object):
         return total_rows
 
     # 源库是oracle时的数据同步的并行处理
-    def oracle_parallel_migrate(self, from_table, to_table, final_parallel, parallel_key=None, parallel_method='multiprocess'):
+    def oracle_parallel_migrate(self, from_table, to_table, final_parallel, parallel_key=None, parallel_method='multiprocess', lob_flag=0):
         # 分批数据
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
@@ -375,7 +387,7 @@ class OracleDataMigrate(object):
         for p in range(final_parallel):
             from_rowid = min_key + (p * per_rows)
             to_rowid = min_key + ((p + 1) * per_rows)
-            sql_info = {'from_db': from_db, 'from_table': from_table, 'to_table': to_table, 'parallel_key': parallel_key, 'per_rows': per_rows, 'from_rowid': from_rowid, 'to_rowid': to_rowid, 'max_key': max_key}
+            sql_info = {'from_db': from_db, 'from_table': from_table, 'to_table': to_table, 'parallel_key': parallel_key, 'per_rows': per_rows, 'from_rowid': from_rowid, 'to_rowid': to_rowid, 'max_key': max_key, 'lob_flag': lob_flag}
             sql_select_list.append(sql_info)
         print('[DBM] Inserting data into table `' + to_table + '`')
         # 多进程
@@ -410,7 +422,8 @@ class OracleDataMigrate(object):
         pri_keys = []
         for i in index_column_info:
             pri_col = i.get('column_name') if i.get('non_unique') == 0 else None
-            col_list = list(filter(lambda x: x.get('column_name') == pri_col and x.get('nullable') == 'N' and x.get('data_type') == 'NUMBER', res_columns))
+            col_list = list(filter(lambda x: x.get('column_name') == pri_col and x.get('nullable') == 'N' and (
+                        x.get('data_type') == 'NUMBER' or x.get('data_type') == 'INTEGER'), res_columns))
             pri_keys.append(col_list[0].get('column_name')) if col_list else None
         if (res_segments[0].get('num_rows') > 100000 or res_segments[0].get('data_length') > 100000000) and pri_keys:
             # 并行主键
@@ -425,11 +438,17 @@ class OracleDataMigrate(object):
         max_parallel = cpu_count()
         # 计算实际并发数=用户指定并发数；如未指定，实际并发数=round(num_rows/10w)
         if parallel == 0:
-            auto_parallel = round(int(res_segments[0].get('num_rows'))/100000)
+            # 考虑lob字段时的并发数  -- modified at 20191204
+            if any(x.get('data_type') == 'CLOB' or x.get('data_type') == 'BLOB' for x in res_columns):
+                auto_parallel = round(int(res_segments[0].get('num_rows'))/1000)
+                lob_flag = 1
+            else:
+                auto_parallel = round(int(res_segments[0].get('num_rows'))/100000)
+                lob_flag = 0
             final_parallel = max(min(auto_parallel, max_parallel), 1)
         else:
             final_parallel = min(parallel, max_parallel)
-        return parallel_flag, final_parallel, parallel_key, parallel_method
+        return parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag
 
 
 if __name__ == '__main__':

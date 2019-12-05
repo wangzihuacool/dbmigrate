@@ -401,26 +401,28 @@ def oracle_to_oracle():
                     oracle_target.oracle_execute_dml(truncate_sql)
                     # 同步数据, 源库是oracle，执行OracleDataMigrate
                     oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = oracle_dbm.oracle_parallel_flag(
+                    parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag = oracle_dbm.oracle_parallel_flag(
                         from_table, index_column_info, res_columns, res_segments, parallel=0)
                     if parallel_flag == 0:
                         total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
                     else:
                         total_rows = oracle_dbm.oracle_parallel_migrate(from_table, to_table, final_parallel,
                                                                         parallel_key=parallel_key,
-                                                                        parallel_method=parallel_method)
+                                                                        parallel_method=parallel_method,
+                                                                        lob_flag=lob_flag)
                     print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 数据追加到目标表
                     oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = oracle_dbm.oracle_parallel_flag(
+                    parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag = oracle_dbm.oracle_parallel_flag(
                         from_table, index_column_info, res_columns, res_segments, parallel=0)
                     if parallel_flag == 0:
                         total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
                     else:
                         total_rows = oracle_dbm.oracle_parallel_migrate(from_table, to_table, final_parallel,
                                                                         parallel_key=parallel_key,
-                                                                        parallel_method=parallel_method)
+                                                                        parallel_method=parallel_method,
+                                                                        lob_flag=lob_flag)
                     print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
