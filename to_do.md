@@ -23,3 +23,7 @@ show create database `tpcd`;
 11、oracle数据库之间，oracle->mysql的数据同步
 
 12、oracle数据库之间和oracle到其他数据库的元数据同步
+
+13、打印每张表的同步耗时
+
+14、增加对postgresql的支持

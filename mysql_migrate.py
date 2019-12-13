@@ -230,7 +230,10 @@ class MysqlTarget(object):
             charset_defination = ('character set ' + res_row.get('collation').split('_')[0]) if res_row.get('collation') else ''
             collation_defination = ('collate ' + res_row.get('collation')) if res_row.get('collation') else ''
             null_defination = 'not null' if res_row.get('null') == 'NO' else 'null'
-            if res_row.get('default'):
+            char_types = 'char, varchar, text, enum'
+            if res_row.get('default') and (res_row.get('type').lower().startswith('char') or res_row.get('type').lower().startswith('varchar') or res_row.get('type').lower().startswith('text') or res_row.get('type').lower().startswith('enum')):
+                default_defination = 'default "' + res_row.get('default') + '"'
+            elif res_row.get('default') and not (res_row.get('type').lower().startswith('char') or res_row.get('type').lower().startswith('varchar') or res_row.get('type').lower().startswith('text') or res_row.get('type').lower().startswith('enum')):
                 default_defination = 'default ' + res_row.get('default')
             elif res_row.get('default') == '':
                 default_defination = 'default ""'
@@ -264,7 +267,7 @@ class MysqlTarget(object):
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination + pri_key_defination + ')' + all_default_defination
         else:
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination_1 + ')' + all_default_defination
-        # print(sql_table_defination)
+        print(sql_table_defination)
         print('[DBM] Create table `' + to_table + '`')
         table_rows = self.MysqlTargetDb.mysql_execute(sql_table_defination)
 
@@ -425,7 +428,7 @@ class MysqlDataMigrate(object):
     def mysql_serial_migrate(self, from_table, to_table):
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
-        sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '`'
+        sql_select = 'select /*!57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')
         # 使用MysqlOperateIncr子类分批获取数据，降低客户端内存压力和网络传输压力
@@ -433,8 +436,8 @@ class MysqlDataMigrate(object):
         # 串行获取数据时每批次获取数据量
         arraysize = 100000
         # 设置session级SQL最大执行时间为1小时
-        sql_max_exec_time = 'set max_execution_time=3600000'
-        mysql_source_incr.mysql_execute(sql_max_exec_time)
+        # sql_max_exec_time = 'set max_execution_time=3600000'
+        # mysql_source_incr.mysql_execute(sql_max_exec_time)
         res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)
         insert_rows_list = []
         while True:
