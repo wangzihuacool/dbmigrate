@@ -267,7 +267,7 @@ class MysqlTarget(object):
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination + pri_key_defination + ')' + all_default_defination
         else:
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination_1 + ')' + all_default_defination
-        print(sql_table_defination)
+        # print(sql_table_defination)
         print('[DBM] Create table `' + to_table + '`')
         table_rows = self.MysqlTargetDb.mysql_execute(sql_table_defination)
 
