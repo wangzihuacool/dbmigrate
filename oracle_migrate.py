@@ -279,7 +279,6 @@ class OracleTarget(object):
             # cx-Oracle调用executemany插入时需要数据集为元祖组成的list
             data = list(data) if not isinstance(data, list) else data
             data_rows = self.OracleTargetConn.insertbatch(insert_sql, data)
-            # data_rows = self.OracleTargetConn.insert_clob(insert_sql, data)
             return data_rows
         else:
             return 0
