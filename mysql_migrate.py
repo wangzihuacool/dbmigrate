@@ -115,8 +115,10 @@ class MysqlSource(object):
     #获取源表涉及的外键
     def mysql_source_fk(self, from_tables):
         res_fk = self.MysqlDb.execute_dict(
-            'SELECT c.constraint_name, c.table_schema, c.table_name, c.column_name, c.ordinal_position, c.position_in_unique_constraint, c.referenced_table_schema, c.referenced_table_name, c.referenced_column_name, r.update_rule, r.delete_rule from information_schema.key_column_usage c	join information_schema.referential_constraints r on c.table_name = r.table_name and c.constraint_name = r.constraint_name and c.referenced_table_name = r.referenced_table_name WHERE c.table_schema = "%s" AND c.constraint_name NOT IN ( "PRIMARY", "primary" ) and c.referenced_table_name is not null' % self.from_db)
+            'SELECT distinct c.constraint_name, c.table_schema, c.table_name, c.column_name, c.ordinal_position, c.position_in_unique_constraint, c.referenced_table_schema, c.referenced_table_name, c.referenced_column_name, r.update_rule, r.delete_rule from information_schema.key_column_usage c	join information_schema.referential_constraints r on c.table_name = r.table_name and c.constraint_name = r.constraint_name and c.referenced_table_name = r.referenced_table_name WHERE c.table_schema = "%s" AND c.constraint_name NOT IN ( "PRIMARY", "primary" ) and c.referenced_table_name is not null' % self.from_db)
+        # 排序参考 https://docs.python.org/3/howto/sorting.html
         res_fk.sort(key=itemgetter('constraint_name', 'ordinal_position', 'position_in_unique_constraint'))
+        # print(res_fk)
         #只获取需要同步的表涉及的外键
         filtered_fk = [fk_record for fk_record in res_fk if fk_record.get('table_name') in from_tables
                        and fk_record.get('referenced_table_name') in from_tables]
