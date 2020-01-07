@@ -14,7 +14,7 @@ import math
 import copy
 from mysql_operate import MysqlOperate, MysqlOperateIncr
 from oracle_migrate import OracleTarget
-from comm_decorator import performance, MyThread
+from comm_decorator import performance, MyThread, escape_string
 #import warnings
 #from itertools import groupby
 
@@ -244,7 +244,10 @@ class MysqlTarget(object):
             else:
                 default_defination = ''
             extra_defination = res_row.get('extra') if res_row.get('extra') else ''
-            comment_defination = ('comment "' + res_row.get('comment') + '"') if res_row.get('comment') else ''
+            # 增加comment内容转义，消除其中的特殊字符的影响 modified at 202001007
+            # comment_defination = ('comment "' + res_row.get('comment') + '"') if res_row.get('comment') else ''
+            value = escape_string(res_row.get('comment'))
+            comment_defination = ('comment "' + value + '"') if value else ''
             column_defination = field_defination + ' ' + type_defination + ' ' + charset_defination + ' ' + \
                                 collation_defination + ' ' + null_defination + ' ' + default_defination + ' ' + \
                                 extra_defination + ' ' + comment_defination + ','
@@ -366,6 +369,26 @@ class MysqlTarget(object):
 
     def mysql_target_close(self):
         self.MysqlTargetDb.close()
+
+
+# 目标库是mysql、源库是oracle时的表结构转换
+class MysqlMetadataMapping(object):
+    def __init__(self, source_type, from_table, res_columns):
+        self.source_type = source_type
+        self.table_name = from_table
+        self.columns_info = res_columns
+        if self.source_type != 'oracle':
+            print('[DBM] ERROR：目前不支持' + self.source_type + '->mysql的元数据转换!')
+            sys.exit(1)
+
+    def column_convert(self, data_type, data_length, data_precision, data_scale):
+        if data_type == 'NUMBER' and data_scale == 0:
+            data_type = 0
+
+        pass
+
+
+
 
 
 # 源库是mysql时的查询和目标库插入方法(for 并行同步)

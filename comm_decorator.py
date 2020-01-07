@@ -6,7 +6,7 @@ import time
 import threading
 from functools import wraps
 
-#定义performance装饰器，用来监控方法的执行性能
+# 定义performance装饰器，用来监控方法的执行性能
 def performance(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
@@ -18,8 +18,20 @@ def performance(f):
     return wrapper
 
 
+# 定义文本转义方法, 参考 pymysql的escape_string方法
+def escape_string(value):
+    _escape_table = [chr(x) for x in range(128)]
+    _escape_table[0] = u'\\0'
+    _escape_table[ord('\\')] = u'\\\\'
+    _escape_table[ord('\n')] = u'\\n'
+    _escape_table[ord('\r')] = u'\\r'
+    _escape_table[ord('\032')] = u'\\Z'
+    _escape_table[ord('"')] = u'\\"'
+    _escape_table[ord("'")] = u"\\'"
+    return value.translate(_escape_table)
 
-#定义一个线程类
+
+# 定义一个线程类
 class MyThread(threading.Thread):
     def __init__(self, func, args=()):
         super(MyThread, self).__init__()
@@ -34,4 +46,5 @@ class MyThread(threading.Thread):
             return self.result
         except Exception:
             return None
+
 

@@ -2,3 +2,39 @@
 2、工具支持CLOB和BLOB数据类型的同步
 3、Oracle数据库同步功能需要安装Oracle客户端
 4、工具暂不支持XMLTYPE数据类型的同步
+
+5、mysql跟oracle的常见数据类型对比关系
+  参考:https://docs.oracle.com/cd/E12151_01/doc.150/e12155/oracle_mysql_compared.htm#BABGACIF
+mysql                     oracle             extra_info
+----------------------------------------------------------
+tinyint                   number(3,0)         1 Byte
+smallint                  number(5,0)         2 Bytes
+mediumint                 number(7,0)         3 Bytes
+int                       number(10,0)        4 Bytes, mysql中int后数字代表位数不够补零，oracle的number类型无此特性
+integer                   number(10,0)        4 Bytes
+bigint                    number(19,0)        8 Bytes
+float                     float               4 Bytes
+double                    float(24)           8 Bytes
+decimal(m,d)              number(m,d)         精度一样
+set                       不支持               set在oracle中不支持
+enum                      不支持               set在oracle中不支持
+
+date                      date                3 Bytes
+datetime                  date                8 Bytes
+timestamp                 date                4 Bytes
+time                      date                3 Bytes
+year                      number              1 Byte
+
+char(m)                   char(3*m)           oracle中存放字节数，mysql中存放字符数，默认按UTF-8每字符最大3字节
+varchar(m)                varchar2(3*m)       当0<=m<1300
+varchar(m)                clob                当m>=1300
+tinytext                  varchar2(255)       tinytext最大255字节
+text                      clob                text最大65k字节
+mediumtext                clob                mediumtext最大2^24字节
+longtext                  clob                longtext最大2^32字节
+tinyblob                  blob,raw            tinyblob最大2^8字节
+blob                      blob,raw            tinyblob最大2^16字节
+longblob                  blob,raw            longblob最大2^32字节
+
+
+
