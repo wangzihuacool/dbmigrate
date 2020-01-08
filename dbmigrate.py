@@ -95,6 +95,17 @@ def mysql_to_mysql():
             if from_functions_ddl:
                 mysql_target.mysql_target_function(from_functions_ddl)
 
+        # 同步全库所有表非主键索引
+        elif content == 'index':
+            for from_table in from_tables:
+                index_column_info = mysql_source.mysql_source_index(from_table)
+                # 目标表
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list:
+                    mysql_target.mysql_drop_index(to_table)
+                    mysql_target.msyql_target_index(to_table, index_column_info)
+
         elif content == 'data':
             print('[DBM] error 100 : 参数错误，content=\'data\' 仅适用于表同步.')
             sys.exit(1)
@@ -288,6 +299,18 @@ def mysql_to_mysql():
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+
+        # 同步表上非主键索引
+        elif content == 'index':
+            for from_table in from_tables:
+                index_column_info = mysql_source.mysql_source_index(from_table)
+                # 目标表
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list:
+                    mysql_target.mysql_drop_index(to_table)
+                    mysql_target.msyql_target_index(to_table, index_column_info)
+
         else:
             print('[DBM] error 100 : content=%s 参数错误.' % content)
     else:

@@ -20,14 +20,17 @@ def performance(f):
 
 # 定义文本转义方法, 参考 pymysql的escape_string方法
 def escape_string(value):
+    # chr() 用一个整数作参数，返回一个对应的字符。
     _escape_table = [chr(x) for x in range(128)]
     _escape_table[0] = u'\\0'
+    # ord() 函数是 chr() 函数（对于 8 位的 ASCII 字符串）的配对函数，它以一个字符串（Unicode 字符）作为参数，返回对应的 ASCII 数值，或者 Unicode 数值
     _escape_table[ord('\\')] = u'\\\\'
     _escape_table[ord('\n')] = u'\\n'
     _escape_table[ord('\r')] = u'\\r'
     _escape_table[ord('\032')] = u'\\Z'
     _escape_table[ord('"')] = u'\\"'
     _escape_table[ord("'")] = u"\\'"
+    # translate() 方法根据参数table给出的表(包含 256 个字符)转换字符串的字符
     return value.translate(_escape_table)
 
 

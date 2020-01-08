@@ -112,7 +112,7 @@ class MysqlSource(object):
         res_data = self.MysqlDb.mysql_select(sql)
         return res_data
 
-    #获取源表涉及的外键
+    # 获取源表涉及的外键
     def mysql_source_fk(self, from_tables):
         res_fk = self.MysqlDb.execute_dict(
             'SELECT distinct c.constraint_name, c.table_schema, c.table_name, c.column_name, c.ordinal_position, c.position_in_unique_constraint, c.referenced_table_schema, c.referenced_table_name, c.referenced_column_name, r.update_rule, r.delete_rule from information_schema.key_column_usage c	join information_schema.referential_constraints r on c.table_name = r.table_name and c.constraint_name = r.constraint_name and c.referenced_table_name = r.referenced_table_name WHERE c.table_schema = "%s" AND c.constraint_name NOT IN ( "PRIMARY", "primary" ) and c.referenced_table_name is not null' % self.from_db)
@@ -290,6 +290,15 @@ class MysqlTarget(object):
             index_rows = self.MysqlTargetDb.mysql_execute(sql_index)
         # print(all_indexes_defination)
 
+    # 删除目标表上的非主键索引, 为满足仅索引同步的需求
+    def mysql_drop_index(self, to_table):
+        print('[DBM] Drop index from table `' + to_table + '`')
+        res_indexes = self.MysqlTargetDb.execute_dict('show index from `%s`.`%s`' % (self.to_db, to_table))
+        for row_index in res_indexes:
+            if row_index.get('key_name') != 'primary' and  row_index.get('key_name') != 'PRIMARY':
+                sql_drop_index = 'alter table `' + self.to_db + '`.`' + to_table + '` drop index ' + row_index.get('key_name')
+                index_rows = self.MysqlTargetDb.mysql_execute(sql_drop_index)
+
     # 创建外键
     def mysql_target_fk(self, final_fk):
         for final_fk_record in final_fk:
@@ -382,8 +391,19 @@ class MysqlMetadataMapping(object):
             sys.exit(1)
 
     def column_convert(self, data_type, data_length, data_precision, data_scale):
-        if data_type == 'NUMBER' and data_scale == 0:
-            data_type = 0
+        if data_type == 'NUMBER' and data_scale == 0 and data_precision <= 3:
+            mysql_type = 'tinyint'
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision <= 5:
+            mysql_type = 'smallint'
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision <= 7:
+            mysql_type = 'mediumint'
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision <= 10:
+            mysql_type = 'int'
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision > 10:
+            mysql_type = 'bigint'
+        elif data_type == 'NUMBER' and data_scale != 0:
+            mysql_type = 'decimal(' + str(data_precision) + ',' + str(data_scale) + ')'
+
 
         pass
 
