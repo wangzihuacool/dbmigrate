@@ -21,9 +21,11 @@ enum                      不支持               set在oracle中不支持
 
 date                      date                3 Bytes
 datetime                  date                8 Bytes
+datetime                  timestamp           mysql中datetime精度最大6位
 timestamp                 date                4 Bytes
 time                      date                3 Bytes
 year                      number              1 Byte
+
 
 char(m)                   char(3*m)           oracle中存放字节数，mysql中存放字符数，默认按UTF-8每字符最大3字节
 varchar(m)                varchar2(3*m)       当0<=m<1300

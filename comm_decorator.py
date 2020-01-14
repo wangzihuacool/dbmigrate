@@ -31,7 +31,7 @@ def escape_string(value):
     _escape_table[ord('"')] = u'\\"'
     _escape_table[ord("'")] = u"\\'"
     # translate() 方法根据参数table给出的表(包含 256 个字符)转换字符串的字符
-    return value.translate(_escape_table)
+    return value.translate(_escape_table) if value else None
 
 
 # 定义一个线程类

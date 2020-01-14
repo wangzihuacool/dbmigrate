@@ -147,6 +147,24 @@ class OracleSource(object):
         [index_column_info.append(i) for i in c if i not in index_column_info]
         return index_column_info
 
+    # 获取源表comment信息(包含表和列，column_name为空的record为表备注)
+    def oracle_source_comment(self, from_table):
+        from_table = from_table.upper()
+        sql_comments = """
+        select lower(table_name) as table_name,
+               lower(column_name) as column_name,
+               comments
+          from user_col_comments
+         where table_name = '{TABLE_NAME}'
+         union
+        select lower(table_name) as table_name, NULL, comments
+          from user_tab_comments
+         where table_type = 'TABLE'
+           and table_name = '{TABLE_NAME}'
+        """
+        res_comments = self.OracleSourceConn.execute_dict(sql_comments.format(TABLE_NAME=from_table))
+        return res_comments
+
     # 获取源表数据
     def oracle_source_data(self, sql):
         res_data = self.OracleSourceConn.execute(sql)
@@ -197,13 +215,19 @@ class OracleSource(object):
         res_pk = list(filter(lambda x: x.get('constraint_type') == 'P' and x.get('table_name') in from_tables, res_constraints))
         # dict取子集
         pk_keys = {'constraint_name', 'table_name', 'column_name'}
-        final_pk = {key: value for key, value in res_pk.items if key in pk_keys}
+        final_pk = []
+        for res in res_pk:
+            final_pk_record = {key: value for key, value in res.items() if key in pk_keys}
+            final_pk.append(final_pk_record)
 
         # 获取需要同步的表的外键
         res_fk = list(filter(lambda x: x.get('constraint_type') == 'R' and x.get('table_name') in from_tables and x.get('r_table_name') in from_tables, res_constraints))
         # dict取子集
         fk_keys = {'constraint_name', 'table_name', 'column_name', 'r_constraint_name', 'r_table_name', 'r_column_name', 'delete_rule'}
-        final_fk = {key: value for key, value in res_fk.items if key in fk_keys}
+        final_fk = []
+        for res in res_fk:
+            final_fk_record = {key: value for key, value in res.items() if key in fk_keys}
+            final_fk.append(final_fk_record)
         return final_pk, final_fk
 
     # 获取源库的所有视图,存储过程，函数和routines

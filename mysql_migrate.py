@@ -15,7 +15,7 @@ import copy
 from mysql_operate import MysqlOperate, MysqlOperateIncr
 from oracle_migrate import OracleTarget
 from comm_decorator import performance, MyThread, escape_string
-#import warnings
+import pysnooper
 #from itertools import groupby
 
 
@@ -260,10 +260,10 @@ class MysqlTarget(object):
 
         # 处理表默认属性
         engine_defination = 'engine=' + res_tablestatus[0].get('engine', 'InnoDB')
-        default_charset_defination = ('default charset=' + res_tablestatus[0].get('collation').split('_')[0]) if res_tablestatus[0].get('collation') else ''
-        default_collation_defination = ('collate=' + res_tablestatus[0].get('collation')) if res_tablestatus[0].get('collation') else ''
-        create_options_defination = res_tablestatus[0].get('create_options')
-        default_comment_defination = ('comment="' + res_tablestatus[0].get('comment') + '"') if res_tablestatus[0].get('comment') else ''
+        default_charset_defination = ('default charset=' + res_tablestatus[0].get('collation').split('_')[0]) if res_tablestatus[0].get('collation') else ' '
+        default_collation_defination = ('collate=' + res_tablestatus[0].get('collation')) if res_tablestatus[0].get('collation') else ' '
+        create_options_defination = res_tablestatus[0].get('create_options') if res_tablestatus[0].get('create_options') else ' '
+        default_comment_defination = ('comment="' + res_tablestatus[0].get('comment') + '"') if res_tablestatus[0].get('comment') else ' '
         all_default_defination = engine_defination + ' ' + default_charset_defination + ' ' + \
                                  default_collation_defination + ' ' + create_options_defination + ' ' + default_comment_defination
 
@@ -276,7 +276,7 @@ class MysqlTarget(object):
         print('[DBM] Create table `' + to_table + '`')
         table_rows = self.MysqlTargetDb.mysql_execute(sql_table_defination)
 
-    # 创建索引
+    # 创建索引(不包含主键)
     # @performance
     def msyql_target_index(self, to_table, index_column_info):
         print('[DBM] Create index on table `' + to_table + '`')
@@ -380,35 +380,137 @@ class MysqlTarget(object):
         self.MysqlTargetDb.close()
 
 
+# @pysnooper.snoop()
 # 目标库是mysql、源库是oracle时的表结构转换
 class MysqlMetadataMapping(object):
-    def __init__(self, source_type, from_table, res_columns):
+    def __init__(self, source_type, from_table, res_pk):
         self.source_type = source_type
         self.table_name = from_table
-        self.columns_info = res_columns
-        if self.source_type != 'oracle':
+        self.res_pk = res_pk
+        if self.source_type.lower() != 'oracle':
             print('[DBM] ERROR：目前不支持' + self.source_type + '->mysql的元数据转换!')
             sys.exit(1)
 
-    def column_convert(self, data_type, data_length, data_precision, data_scale):
-        if data_type == 'NUMBER' and data_scale == 0 and data_precision <= 3:
+    # 数据类型对应关系
+    def _column_mapping(self, data_type, data_length, data_precision, data_scale):
+        if data_type == 'NUMBER' and data_scale == 0 and data_precision and data_precision <= 3:
             mysql_type = 'tinyint'
-        elif data_type == 'NUMBER' and data_scale == 0 and data_precision <= 5:
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision and data_precision <= 5:
             mysql_type = 'smallint'
-        elif data_type == 'NUMBER' and data_scale == 0 and data_precision <= 7:
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision and data_precision <= 7:
             mysql_type = 'mediumint'
-        elif data_type == 'NUMBER' and data_scale == 0 and data_precision <= 10:
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision and data_precision <= 10:
             mysql_type = 'int'
-        elif data_type == 'NUMBER' and data_scale == 0 and data_precision > 10:
+        elif data_type == 'NUMBER' and data_scale == 0 and data_precision and data_precision > 10:
             mysql_type = 'bigint'
-        elif data_type == 'NUMBER' and data_scale != 0:
+        elif data_type == 'NUMBER' and data_scale == 0 and not data_precision:
+            mysql_type = 'int'
+        elif data_type == 'NUMBER' and data_scale != 0 and data_precision and data_scale:
             mysql_type = 'decimal(' + str(data_precision) + ',' + str(data_scale) + ')'
+        elif data_type == 'NUMBER' and not data_precision and not data_scale:
+            mysql_type = 'bigint'
+        elif data_type == 'FLOAT':
+            mysql_type = 'double'
+        if data_type == 'DATE':
+            mysql_type = 'datetime'
+        elif data_type.startswith('TIMESTAMP') and data_scale > 0:
+            mysql_type = 'datetime(' + str(data_scale) + ')'
+        elif data_type.startswith('TIMESTAMP') and (not data_scale or data_scale == 0):
+            mysql_type = 'datetime'
+        if data_type == 'CHAR':
+            mysql_type = 'char(' + str(data_length) + ')'
+        elif data_type == 'VARCHAR2':
+            mysql_type = 'varchar(' + str(data_length) + ')'
+        elif data_type == 'CLOB' and data_length < 4000:
+            mysql_type = 'varchar(' + str(data_length) + ')'
+        elif data_type == 'CLOB' and data_length >= 4000:
+            mysql_type = 'longtext'
+        if data_type == 'BLOB' or data_type == 'RAW':
+            mysql_type = 'blob'
+        return mysql_type
 
+    # 获取表的主键值
+    def _pk_mapping(self):
+        # 获取主键列
+        pk_list = list(filter(lambda x: x.get('table_name') == self.table_name, self.res_pk))
+        pk_columns_info = pk_list[0].get('column_name') if pk_list else None
+        return pk_columns_info
 
-        pass
+    # 字段转换
+    def column_convert(self, res_columns, res_comments):
+        # 列转换
+        mysql_columns = []
+        for record in res_columns:
+            for comment_row in res_comments:
+                if comment_row.get('column_name') and record.get('column_name') == comment_row.get('column_name'):
+                    record.update(comment=comment_row.get('comments'))
+            data_type = record.get('data_type')
+            data_length = record.get('data_length')
+            data_precision = record.get('data_precision')
+            data_scale = record.get('data_scale')
+            mysql_type = self._column_mapping(data_type, data_length, data_precision, data_scale)
+            mysql_nullable = 'YES' if record.get('nullable') == 'Y' else 'NO'
+            mysql_record = dict()
+            mysql_record.setdefault('field', record.get('column_name'))
+            mysql_record.setdefault('type', mysql_type)
+            mysql_record.setdefault('collation', None)
+            mysql_record.setdefault('null', mysql_nullable)
+            pk_columns_info = self._pk_mapping()
+            pk_column_list = pk_columns_info.split(',') if pk_columns_info else []
+            mysql_record.setdefault('key', 'PRI') if record.get('column_name') in pk_column_list else mysql_record.setdefault('key', None)
+            if record.get('data_default') and mysql_type.startswith('datetime') and record.get('data_default') != 'NULL':
+                default_value = 'current_timestamp' + mysql_type.lstrip('datetime')
+                mysql_record.setdefault('default', default_value)
+            elif record.get('data_default') and mysql_type.startswith('timestamp') and record.get('data_default') != 'NULL':
+                default_value = 'current_timestamp' + mysql_type.lstrip('timestamp')
+                mysql_record.setdefault('default', default_value)
+            elif record.get('data_default') and not mysql_type.startswith('datetime') and not mysql_type.startswith('timestamp') and record.get('data_default') != 'NULL':
+                mysql_record.setdefault('default', record.get('data_default'))
+            elif record.get('data_default') == 'NULL':
+                mysql_record.setdefault('default', None)
+            elif not record.get('data_default'):
+                mysql_record.setdefault('default', None)
+            mysql_record.setdefault('extra', None)
+            mysql_record.setdefault('privileges', None)
+            mysql_record.setdefault('comment', record.get('comment'))
+            mysql_columns.append(mysql_record)
+        return mysql_columns
 
+    # 表的comment信息转换
+    def table_comment_convert(self, res_comments):
+        mysql_tablestatus = list(filter(lambda x: not x.get('column_name'), res_comments))
+        return mysql_tablestatus
 
+    # 表上的索引转换
+    # @pysnooper.snoop()
+    def index_convert(self, index_column_info, res_columns):
+        # 去除主键索引
+        pk_columns_info = self._pk_mapping()
+        mysql_indexes = list(filter(lambda x: x.get('column_name') != pk_columns_info and x.get('column_name'), index_column_info))
+        # 针对从Oracle转换过来的BLOB/TEXT字段，取前100字符创建索引,避免mysql error 1170报错
+        for index in mysql_indexes:
+            index_column_list = index.get('column_name').split(',')
+            index_column_list_tmp = list(map(lambda x: x.strip(), index_column_list))
+            for record in res_columns:
+                orignal_column = record.get('column_name') if (record.get('data_type') == 'BLOB' or record.get('data_type') == 'CLOB' or record.get('data_type') == 'RAW') else None
+                if orignal_column and orignal_column in index_column_list_tmp:
+                    i = index_column_list_tmp.index(orignal_column)
+                    index_column_list_tmp[i] = orignal_column + '(100)'
+                index_column_new = ','.join(index_column_list_tmp)
+            index.update(column_name=index_column_new)
+        return mysql_indexes
 
+    # 表上的外键转换
+    @staticmethod
+    def fk_convert(res_fk):
+        mysql_fk = []
+        for fk_record in res_fk:
+            fk_record.update(referenced_table_name=fk_record.get('r_table_name'), referenced_column_name=fk_record.get('r_column_name'), update_rule=fk_record.get('delete_rule'))
+            fk_record.pop('r_table_name')
+            fk_record.pop('r_column_name')
+            fk_record.pop('r_constraint_name')
+            mysql_fk.append(fk_record)
+        return mysql_fk
 
 
 # 源库是mysql时的查询和目标库插入方法(for 并行同步)

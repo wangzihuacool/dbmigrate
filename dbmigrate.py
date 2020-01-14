@@ -6,7 +6,7 @@
 import traceback
 import time, sys
 from env import *
-from mysql_migrate import MysqlSource, MysqlTarget, MysqlDataMigrate
+from mysql_migrate import MysqlSource, MysqlTarget, MysqlDataMigrate, MysqlMetadataMapping
 from oracle_migrate import OracleSource, OracleTarget, OracleDataMigrate
 
 
@@ -45,7 +45,7 @@ def mysql_to_mysql():
                     total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
                 else:
                     total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel, parallel_key=parallel_key, parallel_method=parallel_method)
-                print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                 # trigger同步
                 # to_do
@@ -143,7 +143,7 @@ def mysql_to_mysql():
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                     # trigger同步
                     # to_do
@@ -158,7 +158,7 @@ def mysql_to_mysql():
                         total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel, parallel_key=parallel_key, parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 同步数据
@@ -173,7 +173,7 @@ def mysql_to_mysql():
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     continue
@@ -197,7 +197,7 @@ def mysql_to_mysql():
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                     # trigger同步
                     # to_do
@@ -279,7 +279,7 @@ def mysql_to_mysql():
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
@@ -294,7 +294,7 @@ def mysql_to_mysql():
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
@@ -363,7 +363,7 @@ def mysql_to_oracle():
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 数据追加到目标表
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
@@ -378,7 +378,7 @@ def mysql_to_oracle():
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
                                                                       parallel_method=parallel_method)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
@@ -403,6 +403,7 @@ def oracle_to_oracle():
     if migrate_granularity == 'db':
         print("[DBM] error 999 : 目前Oracle->Oracle的数据库同步只支持表级别的数据同步(content='data')!")
         sys.exit(1)
+    # oracle -> oracle 表级别同步
     elif migrate_granularity == 'table':
         # 只同步表数据
         if content == 'data':
@@ -433,7 +434,7 @@ def oracle_to_oracle():
                                                                         parallel_key=parallel_key,
                                                                         parallel_method=parallel_method,
                                                                         lob_flag=lob_flag)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 数据追加到目标表
                     oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
@@ -446,7 +447,7 @@ def oracle_to_oracle():
                                                                         parallel_key=parallel_key,
                                                                         parallel_method=parallel_method,
                                                                         lob_flag=lob_flag)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
@@ -471,11 +472,136 @@ def oracle_to_mysql():
 
     # oracle -> mysql 数据库级别同步
     if migrate_granularity == 'db':
-        print("[DBM] error 999 : 目前Oracle->Mysql的数据库同步只支持表级别的数据同步(content='data')!")
+        print("[DBM] error 999 : 目前Oracle->Mysql的数据库同步只支持表级别的同步!")
         sys.exit(1)
     elif migrate_granularity == 'table':
+        # oracle->mysql表同步
+        if content == 'all':
+            # 同步数据前禁用外键
+            mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            # 先同步元数据
+            source_type = source_db_info.get('source_db_type')
+            res_pk, res_fk = oracle_source.oracle_source_pk_fk(from_tables)
+            for from_table in from_tables:
+                # oracle源表
+                res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table(from_table)
+                index_column_info = oracle_source.oracle_source_index(from_table)
+                res_comments = oracle_source.oracle_source_comment(from_table)
+                # oracle->mysql的转换
+                mysql_convert = MysqlMetadataMapping(source_type, from_table, res_pk)
+                mysql_columns = mysql_convert.column_convert(res_columns, res_comments)
+                mysql_tablestatus = mysql_convert.table_comment_convert(res_comments)
+                mysql_indexes = mysql_convert.index_convert(index_column_info, res_columns)
+                # 检查mysql目标表是否存在
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    # 删除目标表
+                    mysql_target.mysql_target_execute_no_trans(
+                        'drop table if exists `' + to_db + '`.`' + to_table + '`')
+                    # 创建表
+                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
+                                                    res_tablestatus=mysql_tablestatus)
+                    # 创建索引
+                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    # oracle->mysql的trigger同步(需要么?)
+                    # to_do
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # 先truncate目标表
+                    print('[DBM] Truncate table `' + to_table + '`')
+                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
+
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    pass
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    continue
+                elif to_table not in exist_table_list:
+                    # 创建表
+                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
+                                                    res_tablestatus=mysql_tablestatus)
+                    # 创建索引
+                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    # oracle->mysql的trigger同步(需要么?)
+                    # to_do
+                else:
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+
+                # 同步数据, 源库是oracle，执行OracleDataMigrate
+                oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
+                parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag = oracle_dbm.oracle_parallel_flag(
+                    from_table, index_column_info, res_columns, res_segments, parallel=0)
+                if parallel_flag == 0:
+                    total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
+                else:
+                    total_rows = oracle_dbm.oracle_parallel_migrate(from_table, to_table, final_parallel,
+                                                                    parallel_key=parallel_key,
+                                                                    parallel_method=parallel_method,
+                                                                    lob_flag=lob_flag)
+                print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+            # 外键同步
+            mysql_fk = MysqlMetadataMapping.fk_convert(res_fk)
+            mysql_target.mysql_target_fk(mysql_fk)
+            # 同步后启用外键
+            mysql_target.mysql_target_execute('set foreign_key_checks=1')
+
+        # 表的元数据同步
+        elif content == 'metadata':
+            # 同步数据前禁用外键
+            mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            source_type = source_db_info.get('source_db_type')
+            res_pk, res_fk = oracle_source.oracle_source_pk_fk(from_tables)
+            for from_table in from_tables:
+                # oracle源表
+                res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table(from_table)
+                index_column_info = oracle_source.oracle_source_index(from_table)
+                res_comments = oracle_source.oracle_source_comment(from_table)
+                # oracle->mysql的转换
+                mysql_convert = MysqlMetadataMapping(source_type, from_table, res_pk)
+                mysql_columns = mysql_convert.column_convert(res_columns, res_comments)
+                mysql_tablestatus = mysql_convert.table_comment_convert(res_comments)
+                mysql_indexes = mysql_convert.index_convert(index_column_info, res_columns)
+                # 检查mysql目标表是否存在
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    # 删除目标表
+                    mysql_target.mysql_target_execute_no_trans(
+                        'drop table if exists `' + to_db + '`.`' + to_table + '`')
+                    # 创建表
+                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
+                                                    res_tablestatus=mysql_tablestatus)
+                    # 创建索引
+                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    # oracle->mysql的trigger同步(需要么?)
+                    # to_do
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    continue
+                elif to_table not in exist_table_list:
+                    # 创建表
+                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
+                                                    res_tablestatus=mysql_tablestatus)
+                    # 创建索引
+                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    # oracle->mysql的trigger同步(需要么?)
+                    # to_do
+                else:
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+            # 外键同步
+            mysql_fk = MysqlMetadataMapping.fk_convert(res_fk)
+            mysql_target.mysql_target_fk(mysql_fk)
+            # 同步后启用外键
+            mysql_target.mysql_target_execute('set foreign_key_checks=1')
+
         # 只同步表数据
-        if content == 'data':
+        elif content == 'data':
             # 同步数据前禁用外键
             mysql_target.mysql_target_execute('set foreign_key_checks=0')
             for from_table in from_tables:
@@ -502,7 +628,7 @@ def oracle_to_mysql():
                                                                         parallel_key=parallel_key,
                                                                         parallel_method=parallel_method,
                                                                         lob_flag=lob_flag)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 数据追加到目标表
                     oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
@@ -515,7 +641,7 @@ def oracle_to_mysql():
                                                                         parallel_key=parallel_key,
                                                                         parallel_method=parallel_method,
                                                                         lob_flag=lob_flag)
-                    print('[DBM] inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
                 else:
@@ -523,7 +649,7 @@ def oracle_to_mysql():
             # 同步后启用外键
             mysql_target.mysql_target_execute('set foreign_key_checks=1')
         else:
-            print("[DBM] error 999 : 目前Oracle->Oracle的数据库同步只支持表级别的数据同步(content='data')!")
+            print("[DBM] error 999 : 目前Oracle->Mysql的数据库同步只支持表级别的同步!")
             sys.exit(1)
     else:
         print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
