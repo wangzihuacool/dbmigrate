@@ -3,20 +3,20 @@
 
 #源库
 source_db_type = 'mysql'
-source_host = '172.16.xx.xx'
+source_host = '172.20.221.195'
 source_port = 3306
-source_db = 'xxxx'
+source_db = 'college'
 source_user = 'test'
 source_password = 'test'
 # source_tables = ['sys_user_login_out', 'sys_user_visits', 'sys_user_trajectory']                            # 源库中待同步的表，以列表方式存储，当列表为空时，同步数据库下的所有表到目标库
-source_tables = []
+source_tables = ['admin']
 
 
 #目标库
 target_db_type = 'mysql'
-target_host = '172.16.xx.xx'
+target_host = '172.20.221.195'
 target_port = 3306
-target_db = 'xxxx'                                                   # 目标库名称，目标库名称可以指定与源库不一样；当target_db为空时，则在目标库新建一个与源库同名的数据库
+target_db = 'sbench'                                                   # 目标库名称，目标库名称可以指定与源库不一样；当target_db为空时，则在目标库新建一个与源库同名的数据库
 target_user = 'test'
 target_password = 'test'
 target_tables = None                                                   # 目标表，目标表目前不支持手动指定名称，默认跟source_tables一致
@@ -24,4 +24,4 @@ target_tables = None                                                   # 目标�
 #通用配置
 content = 'metadata'                                                        # all - 同步元数据+数据，[metadata] - 只同步元数据，[data] - 只同步数据, [index] - 只同步索引
 parallel = 0                                                           # 手动指定并行度，为0则由程序自行判断是否并行，建议配置为0
-table_exists_action = 'drop'                                       # 目标表在目标库已存在时的处理方式：drop - 删除旧表；truncate - truncate表数据；append - 插入数据；skip - 跳过该表
+table_exists_action = 'skip'                                       # 目标表在目标库已存在时的处理方式：drop - 删除旧表；truncate - truncate表数据；append - 插入数据；skip - 跳过该表

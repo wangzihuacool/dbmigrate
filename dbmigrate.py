@@ -16,7 +16,7 @@ def mysql_to_mysql():
     mysql_source = MysqlSource(**source_db_info)
     mysql_target = MysqlTarget(**target_db_info)
     mysql_source.source_db_check()
-    from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables)
+    from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables, content=content)
     mysql_target.mysql_target_createdb(migrate_granularity)
     target_tables = from_tables
     mysql_target.mysql_target_execute('set foreign_key_checks=0')
@@ -326,7 +326,7 @@ def mysql_to_oracle():
     mysql_source = MysqlSource(**source_db_info)
     oracle_target = OracleTarget(**target_db_info)
     mysql_source.source_db_check()
-    from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables)
+    from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables, content=content)
     target_tables = from_tables
 
     # mysql -> mysql 数据库级别同步
@@ -667,6 +667,7 @@ if __name__ == '__main__':
     target_db = target_db if target_db else source_db
     to_db = target_db
     source_tables = list(map(lambda x: x.lower(), source_tables))
+    content = content
     source_db_info = {'host': source_host, 'port': source_port, 'db': source_db, 'user': source_user,
                       'password': source_password, 'charset': 'utf8', 'source_db_type': source_db_type}
     target_db_info = {'host': target_host, 'port': target_port, 'db': target_db, 'user': target_user,

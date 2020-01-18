@@ -44,9 +44,10 @@ class MysqlSource(object):
             sys.exit(1)
 
     # 检查配置文件中的表在源库是否存在，未配置则全部表同步
-    def source_table_check(self, *source_tables):
+    def source_table_check(self, *source_tables, **content):
         res_tables = self.MysqlDb.mysql_select('show full tables from `%s` where table_type != "VIEW"' % self.from_db)
         all_table_list = [table[0] for table in res_tables]
+        content = content.get('content')
         if source_tables:
             if set(all_table_list) >= set(source_tables):
                 from_tables = source_tables
@@ -55,9 +56,18 @@ class MysqlSource(object):
                 not_exists_tables = set(source_tables) - set(all_table_list)
                 print('[DBM] Error: 源数据库[' + self.from_db + ']中不存在表:' + str(not_exists_tables) + '.请确认!')
                 sys.exit(1)
-        else:
+        elif not source_tables and (content == 'all' or content == 'metadata'):
             from_tables = all_table_list
             migrate_granularity = 'db'
+        elif not source_tables and content == 'data':
+            print('[DBM] error 100 : 参数错误，content=\'data\' 仅适用于表同步.')
+            sys.exit(1)
+        elif not source_tables and content == 'index':
+            from_tables = all_table_list
+            migrate_granularity = 'table'
+        else:
+            print('[DBM] Error: source_tables 和 content参数错误.请确认!')
+            sys.exit(1)
         return from_tables, migrate_granularity
 
     # 获取源表元数据
@@ -208,6 +218,10 @@ class MysqlTarget(object):
     def mysql_target_createdb(self, migrate_granularity):
         res_db = self.MysqlTargetDb.mysql_select('show databases')
         if self.to_db in [db[0] for db in res_db] and migrate_granularity == 'db':
+            # print('DBM Warnning: 数据库级别的同步会删除目标库，请确认！')
+            var = input('DBM Warnning: 数据库级别的同步会删除目标库,继续?y[n]')
+            if var != 'y' and var != 'Y':
+                sys.exit(1)
             self.MysqlTargetDb.mysql_execute('drop database if exists %s' % self.to_db)
             self.MysqlTargetDb.mysql_execute('create database if not exists %s' % self.to_db)
         elif self.to_db in [db[0] for db in res_db] and migrate_granularity == 'table':
