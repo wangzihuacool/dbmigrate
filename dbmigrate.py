@@ -97,20 +97,22 @@ def mysql_to_mysql():
 
         # 同步全库所有表非主键索引
         elif content == 'index':
-            for from_table in from_tables:
-                index_column_info = mysql_source.mysql_source_index(from_table)
-                # 目标表
-                exist_table_list = mysql_target.mysql_target_exist_tables()
-                to_table = from_table
-                if to_table in exist_table_list:
-                    mysql_target.mysql_drop_index(to_table)
-                    mysql_target.msyql_target_index(to_table, index_column_info)
+            print('DBM Error 200: mysql数据库索引同步在table级别实现。')
+            sys.exit(1)
+            #for from_table in from_tables:
+            #    index_column_info = mysql_source.mysql_source_index(from_table)
+            #    # 目标表
+            #    exist_table_list = mysql_target.mysql_target_exist_tables()
+            #    to_table = from_table
+            #    if to_table in exist_table_list:
+            #        mysql_target.mysql_drop_index(to_table)
+            #        mysql_target.msyql_target_index(to_table, index_column_info)
 
         elif content == 'data':
-            print('[DBM] error 100 : 参数错误，content=\'data\' 仅适用于表同步.')
+            print('[DBM] Error 100 : 参数错误，content=\'data\' 仅适用于表同步.')
             sys.exit(1)
         else:
-            print('[DBM] error 100 : 参数错误，content=%s.' % content)
+            print('[DBM] Error 100 : 参数错误，content=%s.' % content)
             sys.exit(1)
     # mysql -> mysql 表级别同步
     elif migrate_granularity == 'table':
