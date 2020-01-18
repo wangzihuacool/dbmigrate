@@ -309,10 +309,11 @@ class MysqlTarget(object):
     def mysql_drop_index(self, to_table):
         print('[DBM] Drop index from table `' + to_table + '`')
         res_indexes = self.MysqlTargetDb.execute_dict('show index from `%s`.`%s`' % (self.to_db, to_table))
-        for row_index in res_indexes:
-            if row_index.get('key_name') != 'primary' and  row_index.get('key_name') != 'PRIMARY':
-                sql_drop_index = 'alter table `' + self.to_db + '`.`' + to_table + '` drop index ' + row_index.get('key_name')
-                index_rows = self.MysqlTargetDb.mysql_execute(sql_drop_index)
+        res_indexes.sort(key=itemgetter('key_name', 'seq_in_index'))
+        index_set = set(list(filter(lambda x: x != 'primary' and x != 'PRIMARY', map(lambda x: x.get('key_name'), res_indexes))))
+        for key_name in index_set:
+            sql_drop_index = 'alter table `' + self.to_db + '`.`' + to_table + '` drop index `' + key_name + '`'
+            index_rows = self.MysqlTargetDb.mysql_execute(sql_drop_index)
 
     # 创建外键
     def mysql_target_fk(self, final_fk):
