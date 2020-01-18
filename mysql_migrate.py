@@ -248,7 +248,8 @@ class MysqlTarget(object):
             null_defination = 'not null' if res_row.get('null') == 'NO' else 'null'
             char_types = 'char, varchar, text, enum'
             if res_row.get('default') and (res_row.get('type').lower().startswith('char') or res_row.get('type').lower().startswith('varchar') or res_row.get('type').lower().startswith('text') or res_row.get('type').lower().startswith('enum')):
-                default_defination = 'default "' + res_row.get('default') + '"'
+                value = escape_string(res_row.get('default'))
+                default_defination = 'default "' + value + '"'
             elif res_row.get('default') and not (res_row.get('type').lower().startswith('char') or res_row.get('type').lower().startswith('varchar') or res_row.get('type').lower().startswith('text') or res_row.get('type').lower().startswith('enum')):
                 default_defination = 'default ' + res_row.get('default')
             elif res_row.get('default') == '':
