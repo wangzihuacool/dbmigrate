@@ -17,7 +17,7 @@ def mysql_to_mysql():
     mysql_target = MysqlTarget(**target_db_info)
     mysql_source.source_db_check()
     from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables, content=content)
-    mysql_target.mysql_target_createdb(migrate_granularity)
+    mysql_target.mysql_target_createdb(migrate_granularity, **target_db_info)
     target_tables = from_tables
     mysql_target.mysql_target_execute('set foreign_key_checks=0')
 

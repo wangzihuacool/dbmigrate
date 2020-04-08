@@ -202,10 +202,10 @@ class MysqlSource(object):
 class MysqlTarget(object):
     # 检查目标库连接
     def __init__(self, **target_db_info):
-        new_db_info = copy.deepcopy(target_db_info)
-        new_db_info['db'] = None
+        # self.new_db_info = copy.deepcopy(target_db_info)
+        # new_db_info['db'] = None
         try:
-            self.MysqlTargetDb = MysqlOperate(**new_db_info)
+            self.MysqlTargetDb = MysqlOperate(**target_db_info)
             self.to_db = target_db_info.get('db')
             self.MysqlTargetDb.mysql_execute('use %s' % self.to_db)
         except Exception as e:
@@ -214,20 +214,31 @@ class MysqlTarget(object):
             traceback.print_exc()
             sys.exit(1)
 
-    # 创建目标数据库
-    def mysql_target_createdb(self, migrate_granularity):
-        res_db = self.MysqlTargetDb.mysql_select('show databases')
-        if self.to_db in [db[0] for db in res_db] and migrate_granularity == 'db':
+    # 创建目标数据库, 这里单独建立连接，db设置为None
+    @staticmethod
+    def mysql_target_createdb(migrate_granularity, **target_db_info):
+        new_db_info = copy.deepcopy(target_db_info)
+        new_db_info['db'] = None
+        try:
+            MysqlTargetDb = MysqlOperate(**new_db_info)
+            to_db = target_db_info.get('db')
+        except Exception as e:
+            print('DBM Error: can not connect to target db: ' + target_db_info.get('host') + ':' +
+                  str(target_db_info.get('port')) + '/' + target_db_info.get('db'))
+            traceback.print_exc()
+            sys.exit(1)
+        res_db = MysqlTargetDb.mysql_select('show databases')
+        if to_db in [db[0] for db in res_db] and migrate_granularity == 'db':
             # print('DBM Warnning: 数据库级别的同步会删除目标库，请确认！')
             var = input('DBM Warnning: 数据库级别的同步会删除目标库,继续?y[n]')
             if var != 'y' and var != 'Y':
                 sys.exit(1)
-            self.MysqlTargetDb.mysql_execute('drop database if exists %s' % self.to_db)
-            self.MysqlTargetDb.mysql_execute('create database if not exists %s' % self.to_db)
-        elif self.to_db in [db[0] for db in res_db] and migrate_granularity == 'table':
+            MysqlTargetDb.mysql_execute('drop database if exists %s' % to_db)
+            MysqlTargetDb.mysql_execute('create database if not exists %s' % to_db)
+        elif to_db in [db[0] for db in res_db] and migrate_granularity == 'table':
             pass
         else:
-            self.MysqlTargetDb.mysql_execute('create database if not exists %s' % self.to_db)
+            MysqlTargetDb.mysql_execute('create database if not exists %s' % to_db)
 
     # 检查目标库已存在的表
     def mysql_target_exist_tables(self):
