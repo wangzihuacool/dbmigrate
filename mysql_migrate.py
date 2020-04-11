@@ -571,10 +571,10 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
         batch_from = from_rowid + (b * batch_rows)
         batch_to = to_rowid if (b == batch_num -1) else (from_rowid + ((b + 1) * batch_rows))
         if batch_to >= max_key:
-            sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + \
+            sql_select = 'select /* !40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + \
                          parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` <= ' + str(max_key)
         else:
-            sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` < ' + str(batch_to)
+            sql_select = 'select /* !40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` < ' + str(batch_to)
         #print(sql_select)
         sql_data = mysql_source.mysql_source_data(sql_select)
         insert_rows = multi_db_target.insert_target_data(to_table, sql_data)
@@ -602,7 +602,7 @@ class MysqlDataMigrate(object):
     def mysql_serial_migrate(self, from_table, to_table):
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
-        sql_select = 'select /*!57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
+        sql_select = 'select /* !57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')
         # 使用MysqlOperateIncr子类分批获取数据，降低客户端内存压力和网络传输压力
@@ -644,7 +644,7 @@ class MysqlDataMigrate(object):
             to_rowid = min_key + ((p + 1) * per_rows)
             sql_info = {'from_db': from_db, 'from_table': from_table, 'to_table': to_table, 'parallel_key': parallel_key, 'per_rows': per_rows, 'from_rowid': from_rowid, 'to_rowid': to_rowid, 'max_key': max_key}
             sql_select_list.append(sql_info)
-            #sql_select = 'select /*!40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + \
+            #sql_select = 'select /* !40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + \
             #             str(min_key + (p * per_rows)) + ' and `' + parallel_key + '` < ' + str(min_key + ((p + 1) * per_rows))
             #select_insert_dict = {'table_name': to_table, 'sql_statement': sql_select}
             #sql_select_list.append(select_insert_dict)
@@ -710,7 +710,7 @@ class MysqlDataMigrate(object):
     def mysql_incr_serial_migrate(self, from_table, to_table, incremental_method=None, where_clause=None):
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
-        sql_select_original = 'select /*!57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
+        sql_select_original = 'select /* !57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
         sql_select = sql_select_original + ' ' + where_clause if incremental_method == 'where' else sql_select_original
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')

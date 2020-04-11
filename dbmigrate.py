@@ -300,7 +300,7 @@ def mysql_to_mysql():
                                                                       parallel_method=parallel_method)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
-                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
 
@@ -332,7 +332,7 @@ def mysql_to_mysql():
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
                     # truncate目标表
                     print('[DBM] truncate table ' + to_table)
-                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
+                    numrows = mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
                     # 同步数据, 增量同步目前只支持串行
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     # parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table, res_tablestatus, res_columns, parallel=parallel)
@@ -359,7 +359,7 @@ def mysql_to_mysql():
                     else:
                         print('[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
                 elif to_table in exist_table_list and table_exists_action == 'skip':
-                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
         else:
@@ -431,7 +431,7 @@ def mysql_to_oracle():
                                                                       parallel_method=parallel_method)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
-                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
         else:
@@ -500,7 +500,7 @@ def oracle_to_oracle():
                                                                         lob_flag=lob_flag)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
-                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
             # 同步后启用外键
@@ -694,7 +694,7 @@ def oracle_to_mysql():
                                                                         lob_flag=lob_flag)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
-                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
             # 同步后启用外键

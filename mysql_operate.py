@@ -88,8 +88,8 @@ class MysqlOperate(object):
             finally:
                 return numrows
 
-    #mysql的批量插入语句
-    #@performance
+    # mysql的批量插入语句,报错4603时不启用事务以兼容DRDS这种分库分表的数据库连接, updated by wl_lw at 20204011
+    # @performance
     def mysql_executemany(self, sql, data):
         with self.connection.cursor() as conn_cursor:
             try:
@@ -97,6 +97,15 @@ class MysqlOperate(object):
                 conn_cursor.executemany(sql, data)
                 self.connection.commit()
                 numrows = conn_cursor.rowcount
+            except pymysql.Error as e:
+                if e.args[0] == 4603:
+                    self.connection.rollback()
+                    conn_cursor.executemany(sql, data)
+                    numrows = conn_cursor.rowcount
+                else:
+                    traceback.print_exc()
+                    self.connection.rollback()
+                    numrows = 0
             except Exception as e:
                 traceback.print_exc()
                 self.connection.rollback()
