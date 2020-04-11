@@ -26,7 +26,7 @@ curr_dir = os.path.dirname(os.path.realpath(sys.argv[0]))
 config_file = curr_dir + os.sep + "dbmigrate.conf"
 conf = EnvLoader.load_with_file(config_file)
 
-#section：源库
+# section：源库
 source_db_type = conf.get('source_db_type')
 source_host = conf.get('source_host')
 source_port = conf.get('source_port')
@@ -34,7 +34,7 @@ source_db = conf.get('source_db')
 source_user = conf.get('source_user')
 source_password = conf.get('source_password')
 source_tables = conf.get('source_tables')
-#section：目标库
+# section：目标库
 target_db_type = conf.get('target_db_type')
 target_host = conf.get('target_host')
 target_port = conf.get('target_port')
@@ -42,7 +42,9 @@ target_db = conf.get('target_db')
 target_user = conf.get('target_user')
 target_password = conf.get('target_password')
 target_tables = conf.get('target_tables')
-#section：通用配置
+# section：通用配置
 content = conf.get('content')
 parallel = conf.get('parallel')
 table_exists_action = conf.get('table_exists_action')
+incremental_method = conf.get('incremental_method')
+where_clause = conf.get('where_clause')

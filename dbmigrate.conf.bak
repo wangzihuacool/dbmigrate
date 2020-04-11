@@ -1,0 +1,31 @@
+# dbmigrate config file
+# mysql数据库级别迁移时如果涉及函数迁移，目标库用户需要拥有super权限
+# 使用实例1： 手动指定where条件同步单张表的数据，并且删除目标表现有数据
+#            source_tables = ['test'], content = 'increment', table_exists_action = 'truncate', incremental_method = 'where', where_clause = 'where id > 1'
+
+#源库
+source_db_type = 'mysql'
+source_host = '172.16.xx.xx'
+source_port = 3306
+source_db = 'xxxx'
+source_user = 'test'
+source_password = 'test'
+# source_tables = ['sys_user_login_out', 'sys_user_visits', 'sys_user_trajectory']                            # 源库中待同步的表，以列表方式存储，当列表为空时，同步数据库下的所有表到目标库
+source_tables = []
+
+
+#目标库
+target_db_type = 'mysql'
+target_host = '172.16.xx.xx'
+target_port = 3306
+target_db = 'xxxx'                                                    # 目标库名称，目标库名称可以指定与源库不一样；当target_db为空时，则在目标库新建一个与源库同名的数据库
+target_user = 'test'
+target_password = 'test'
+target_tables = None                                                  # 目标表，目标表目前不支持手动指定名称，默认跟source_tables一致
+
+#通用配置
+content = 'metadata'                                                  # [all] - 同步元数据+数据，[metadata] - 只同步元数据，[data] - 只同步数据, [index] - 只同步索引, [increment] - 增量同步数据
+parallel = 0                                                          # 手动指定并行度，为0则由程序自行判断是否并行，建议配置为0
+table_exists_action = 'drop'                                          # 目标表在目标库已存在时的处理方式：drop - 删除旧表；truncate - truncate表数据；append - 插入数据；skip - 跳过该表
+incremental_method = 'where'                                          # 获取增量数据的方式，[where] - 自定义where查询条件
+where_clause = 'where create_time >= date_sub(curdate(), interval 2 day)'   # 获取增量数据时的查询条件,仅当content='increment'和incremental_method='where'时生效

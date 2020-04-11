@@ -2,7 +2,9 @@
 
 '''
 数据库迁移主程序
+NOTE: 增加mysql的基于where条件的增量数据同步 updated by wl_lw at 20200411
 '''
+
 import traceback
 import time, sys
 from env import *
@@ -313,12 +315,59 @@ def mysql_to_mysql():
                     mysql_target.mysql_drop_index(to_table)
                     mysql_target.msyql_target_index(to_table, index_column_info)
 
+        elif content == 'increment':
+            # 增量同步表数据, added by wl_lw at 20200411
+            if not incremental_method or incremental_method.lower == 'none':
+                print('[DBM] error 100: 参数错误, incremental_method=%s 参数错误.' % incremental_method)
+                sys.exit(1)
+            for from_table in from_tables:
+                res_tablestatus, res_createtable, res_columns, res_triggers = mysql_source.mysql_source_table(from_table)
+                index_column_info = mysql_source.mysql_source_index(from_table)
+                # 目标表
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # truncate目标表
+                    print('[DBM] truncate table ' + to_table)
+                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
+                    # 同步数据, 增量同步目前只支持串行
+                    mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
+                    # parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table, res_tablestatus, res_columns, parallel=parallel)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                        total_rows = mysql_dbm.mysql_incr_serial_migrate(from_table, to_table, incremental_method=incremental_method, where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print('[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 同步数据, 增量同步目前只支持串行
+                    mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
+                    # parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table, res_tablestatus, res_columns, parallel=parallel)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                        total_rows = mysql_dbm.mysql_incr_serial_migrate(from_table, to_table, incremental_method=incremental_method, where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print('[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + 'skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
         else:
             print('[DBM] error 100 : content=%s 参数错误.' % content)
     else:
         print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
         sys.exit(1)
-    #恢复约束
+    # 恢复约束
     mysql_target.mysql_target_execute('set foreign_key_checks=1')
 
 

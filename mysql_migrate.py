@@ -683,8 +683,11 @@ class MysqlDataMigrate(object):
         pri_keys = [(record.get('field'), record.get('type')) for record in res_columns if
                     (record['key'] == 'PRI' or record['key'] == 'pri')]
         pri_key_types = [pri_key[1] for pri_key in pri_keys]
-        if (res_tablestatus[0].get('rows') > 100000 or res_tablestatus[0].get('data_length') > 100000000) and 'int' in [key_type for key_type in pri_key_types][0]:
-            #并行主键
+        if not pri_key_types:
+            parallel_key = None
+            parallel_flag = 0
+        elif (res_tablestatus[0].get('rows') > 100000 or res_tablestatus[0].get('data_length') > 100000000) and 'int' in [key_type for key_type in pri_key_types][0]:
+            # 并行主键
             parallel_key = [k[0] for k in pri_keys if 'int' in k[1]][0]
             parallel_flag = 1 if parallel_key else 0
         else:
@@ -703,3 +706,29 @@ class MysqlDataMigrate(object):
             final_parallel = min(parallel, max_parallel)
         return parallel_flag, final_parallel, parallel_key, parallel_method
 
+    # 源库是mysql时的增量数据同步串行处理方法
+    def mysql_incr_serial_migrate(self, from_table, to_table, incremental_method=None, where_clause=None):
+        from_db = self.source_db_info.get('db')
+        to_db = self.target_db_info.get('db')
+        sql_select_original = 'select /*!57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
+        sql_select = sql_select_original + ' ' + where_clause if incremental_method == 'where' else sql_select_original
+        sql_info = {'table_name': to_table, 'sql_statement': sql_select}
+        print('[DBM] Inserting data into table `' + to_table + '`')
+        # 使用MysqlOperateIncr子类分批获取数据，降低客户端内存压力和网络传输压力
+        mysql_source_incr = MysqlOperateIncr(**self.source_db_info)
+        # 串行获取数据时每批次获取数据量
+        arraysize = 10000
+        # 设置session级SQL最大执行时间为1小时
+        # sql_max_exec_time = 'set max_execution_time=3600000'
+        # mysql_source_incr.mysql_execute(sql_max_exec_time)
+        res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)
+        insert_rows_list = []
+        while True:
+            data_incr = next(res_data_incr)
+            if data_incr:
+                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr)
+                insert_rows_list.append(insert_rows)
+            else:
+                break
+        total_rows = reduce(lambda x, y: x + y, insert_rows_list) if insert_rows_list else 0
+        return total_rows
