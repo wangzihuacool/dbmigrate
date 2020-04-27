@@ -338,7 +338,7 @@ def oracle_select_insert(sql_info, source_db_info, target_db_info):
     to_rowid = sql_info.get('to_rowid')
     max_key = sql_info.get('max_key')
     lob_flag = sql_info.get('lob_flag')
-    # 每进程每次同步10w行记录，分批循环处理; 如果存在lob字段则每批次同步50行 -- modified at 20191204
+    # 每进程每次同步10w行记录，分批循环处理; 如果存在lob字段则每批次同步10行 -- modified at 20191204
     batch_rows = 100000 if lob_flag == 0 else 10
     batch_num = math.ceil((to_rowid - from_rowid)/batch_rows)
     # 每进程内最大循环批次为100，超过100时则增加每次同步记录数 --modified at 20191009
