@@ -46,7 +46,14 @@ class MysqlSource(object):
     # 检查配置文件中的表在源库是否存在，未配置则全部表同步
     def source_table_check(self, *source_tables, **content):
         res_tables = self.MysqlDb.mysql_select('show full tables from `%s` where table_type != "VIEW"' % self.from_db)
-        all_table_list = [table[0] for table in res_tables]
+        # 检查源库是否大小写敏感,如果大小写不敏感则全部转换为小写. added by wl_lw at 20200612
+        res_case_sensitive = self.MysqlDb.mysql_select("show variables like 'lower_case_table_names'")
+        if res_case_sensitive[0][0] == 1:
+            source_tables = list(map(lambda x: x.lower(), source_tables))
+            all_table_list = [table[0].lower() for table in res_tables]
+        else:
+            source_tables = source_tables
+            all_table_list = [table[0] for table in res_tables]
         content = content.get('content')
         if source_tables:
             if set(all_table_list) >= set(source_tables):

@@ -6,7 +6,8 @@ NOTE: 增加mysql的基于where条件的增量数据同步 updated by wl_lw at 2
 '''
 
 import traceback
-import time, sys
+import time, sys, os, stat
+import requests
 from env import *
 from mysql_migrate import MysqlSource, MysqlTarget, MysqlDataMigrate, MysqlMetadataMapping
 from oracle_migrate import OracleSource, OracleTarget, OracleDataMigrate
@@ -707,8 +708,37 @@ def oracle_to_mysql():
         sys.exit(1)
 
 
+# 版本控制
+def dbm_version(current_release=None):
+    if current_release:
+        release_url = 'http://172.20.222.218:9003/dbm_check_version?current_release=' + str(current_release)
+        update1_url = 'http://172.20.222.218:9003/dbm_latest_version/dbmigrate'
+        update2_url = 'http://172.20.222.218:9003/dbm_latest_version/dbmigrate.conf'
+        try:
+            resp = requests.get(release_url)
+            if resp.status_code == 444:
+                print('dbmigrate版本更新中，功能和性能进一步增强~~~~')
+                resp1 = requests.get(update1_url)
+                with open("dbmigrate_new", 'wb') as f:
+                    f.write(resp1.content)
+                os.chmod("dbmigrate_new", stat.S_IRWXU|stat.S_IRWXG)
+                os.rename("dbmigrate", "dbmigrate_old")
+                os.rename("dbmigrate_new", "dbmigrate")
+                resp2 = requests.get(update2_url)
+                with open("dbmigrate.conf.sample", 'wb') as f:
+                    f.write(resp2.content)
+                print('dbmigrate版本更新完成，请重新启动.')
+                os._exit(0)
+        except:
+            pass
+
+
 # 主程序
 if __name__ == '__main__':
+    # 增加版本标识
+    current_release = 20200612
+    dbm_version(current_release=current_release)
+
     # 参数
     begin_time = time.time()
     print('DBM开始同步: source_db:' + source_host + ':' + str(
@@ -717,14 +747,14 @@ if __name__ == '__main__':
     target_db_type = target_db_type
     target_db = target_db if target_db else source_db
     to_db = target_db
-    source_tables = list(map(lambda x: x.lower(), source_tables))
+    # source_tables = list(map(lambda x: x.lower(), source_tables))
     content = content
     source_db_info = {'host': source_host, 'port': source_port, 'db': source_db, 'user': source_user,
                       'password': source_password, 'charset': 'utf8', 'source_db_type': source_db_type}
     target_db_info = {'host': target_host, 'port': target_port, 'db': target_db, 'user': target_user,
                       'password': target_password, 'charset': 'utf8', 'target_db_type': target_db_type}
 
-    # 判断同步粒度
+    # 初步判断同步粒度
     if source_tables:
         migrate_granularity = 'table'
     else:

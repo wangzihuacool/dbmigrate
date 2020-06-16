@@ -63,6 +63,8 @@ class MysqlOperate(object):
     # mysql的DML语句
     def mysql_execute(self, sql, *args):
         with self.connection.cursor() as conn_cursor:
+
+
             try:
                 conn_cursor.execute('start transaction')
                 conn_cursor.execute(sql, *args)

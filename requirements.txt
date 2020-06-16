@@ -1,4 +1,5 @@
 pymysql
 cx-Oracle
 pysnooper
-# oracle同步时需要安装oracle客户端
+requests
+# oracle同步时需要安装oracle客户端, 版本管理用到requests
