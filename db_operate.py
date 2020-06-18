@@ -120,7 +120,6 @@ class DbOperate(object):
                 mid_results = self.cursor.fetchmany(numRows=num_rows)
                 results = [tuple([(c.read() if type(c) == cx_Oracle.LOB else c) for c in r]) for r in mid_results]
                 yield results
-
         # 无lob字段时的增量返回结果集
         else:
             while True:
@@ -181,28 +180,20 @@ class DbOperate(object):
             yield results
             i += size
 
+    # 获取源表列名，用于源库和目标库的表结构不完全一致的情况 added by wl_lw at 20200618
+    def oracle_columns(self, sql):
+        fake_sql = 'select * from (' + sql + ') where rownum = 0'
+        self.cursor.execute(fake_sql)
+        col_names = [i[0].lower() for i in self.cursor.description]
+        return col_names
+
     def close(self):
         self.cursor.close()
         self.conn.commit()
         #可以直接close连接
         self.conn.close()
 
-        #也可以从DbOperate.__ConnPool中release连接
-        #if self.session_pool:
-        #    self.cursor.close()
-        #    DbOperate.__ConnPool.release(self.conn)
 
-    # for blob insert测试
-    #binary_var = self.cursor.var(cx_Oracle.BLOB, arraysize=10000)
-    #data = []
-    #for row in params:
-    #    r = list(row)
-    #    for key, col in enumerate(r):
-    #        if isinstance(col, bytes):
-    #            binary_var.setvalue(0, col)
-    #            r[key] = binary_var
-    #    new_row = tuple(r)
-    #    data.append(new_row)
 
 
 class DbMonitor(object):

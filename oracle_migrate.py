@@ -170,6 +170,11 @@ class OracleSource(object):
         res_data = self.OracleSourceConn.execute(sql)
         return res_data
 
+    # 获取源表列名，用于源库和目标库的表结构不完全一致的情况 added by wl_lw at 20200618
+    def oracle_source_columns(self, sql):
+        columns = self.OracleSourceConn.oracle_columns(sql)
+        return columns
+
     # 增量获取表数据
     def oracle_source_data_incr(self, sql, arraysize=100000):
         res_data = self.OracleSourceConn.oracle_select_incr(sql, arraysize=arraysize)
@@ -295,11 +300,16 @@ class OracleTarget(object):
             self.OracleTargetConn.executedml(sql)
 
     # 传输数据到目标表
-    def insert_target_data(self, to_table, data):
+    # 增加附带列名的插入，用于源库和目标库的表结构不完全一致的情况，added by wl_lw at 20200618
+    def insert_target_data(self, to_table, data, columns=None):
         if data:
             str_list = [(':' + str(i)) for i in range(len(data[0]))]
             value_str = ','.join(str_list)
-            insert_sql = 'insert into ' + to_table + ' values (' + value_str + ')'
+            if not columns:
+                insert_sql = 'insert into ' + to_table + ' values (' + value_str + ')'
+            else:
+                column_str = ','.join(columns)
+                insert_sql = 'insert into ' + to_table + '(' + column_str + ') values (' + value_str + ')'
             # cx-Oracle调用executemany插入时需要数据集为元祖组成的list
             data = list(data) if not isinstance(data, list) else data
             data_rows = self.OracleTargetConn.insertbatch(insert_sql, data)
@@ -354,7 +364,8 @@ def oracle_select_insert(sql_info, source_db_info, target_db_info):
         else:
             sql_select = 'select * from ' + from_table + ' where ' + parallel_key + ' >= ' + str(batch_from) + ' and ' + parallel_key + ' < ' + str(batch_to)
         sql_data = oracle_source.oracle_source_data(sql_select)
-        insert_rows = multi_db_target.insert_target_data(to_table, sql_data)
+        sql_columns = oracle_source.oracle_source_columns(sql_select)
+        insert_rows = multi_db_target.insert_target_data(to_table, sql_data, columns=sql_columns)
         insert_rows_list.append(insert_rows)
     total_rows = reduce(lambda x, y: x + y, insert_rows_list)
     return total_rows
@@ -382,11 +393,12 @@ class OracleDataMigrate(object):
         sql_select = 'select /*+ parallel(t 4) */ * from ' + from_table + ' t'
         # 串行获取数据,每批10w行
         res_data_incr = self.oracle_source.oracle_source_data_incr(sql_select)
+        sql_columns = self.oracle_source.oracle_source_columns(sql_select)
         insert_rows_list = []
         while True:
             data_incr = next(res_data_incr)
             if data_incr:
-                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr)
+                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr, columns=sql_columns)
                 insert_rows_list.append(insert_rows)
             else:
                 break
