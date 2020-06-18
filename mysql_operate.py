@@ -159,7 +159,13 @@ class MysqlOperateIncr(MysqlOperate):
                 results = conn_cursor.fetchmany(size=arraysize)
                 yield results
 
-
+    # 获取源表列名，用于源库和目标库的表结构不完全一致的情况 added by wl_lw at 20200618
+    def mysql_select_column(self, sql):
+        fake_sql = sql + ' limit 0'
+        with self.connection.cursor() as conn_cursor:
+            conn_cursor.execute(fake_sql)
+            col_names = [i[0].lower() for i in conn_cursor.description]
+            return col_names
 
 # main
 if __name__ == "__main__":

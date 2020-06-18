@@ -388,11 +388,16 @@ class MysqlTarget(object):
                 function_rows = self.MysqlTargetDb.mysql_execute(sql_function)
 
     # 传输数据到目标表
-    def insert_target_data(self, to_table, data):
+    # to_do 增加附带列名的插入，用于源库和目标库的表结构不完全一致的情况，added by wl_lw at 20200618
+    def insert_target_data(self, to_table, data, columns=None):
         if data:
             str_list = ['%s' for i in range(len(data[0]))]
             value_str = ','.join(str_list)
-            insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '` values (' + value_str + ')'
+            if not columns:
+                insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '` values (' + value_str + ')'
+            else:
+                column_str = ','.join(columns)
+                insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '`(' + column_str + ') values (' + value_str + ')'
             # 默认情况下，自增列插入0或null时，该列使用auto_increment自增；修改sql_mode使得插入0时就插入数字0，以匹配阿里云的配置。
             self.MysqlTargetDb.mysql_execute_no_trans("set sql_mode='NO_AUTO_VALUE_ON_ZERO'")
             data_rows = self.MysqlTargetDb.mysql_executemany(insert_sql, data)
@@ -728,12 +733,13 @@ class MysqlDataMigrate(object):
         # 设置session级SQL最大执行时间为1小时
         # sql_max_exec_time = 'set max_execution_time=3600000'
         # mysql_source_incr.mysql_execute(sql_max_exec_time)
+        columns = mysql_source_incr.mysql_select_column(sql_select)
         res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)
         insert_rows_list = []
         while True:
             data_incr = next(res_data_incr)
             if data_incr:
-                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr)
+                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr, columns=columns)
                 insert_rows_list.append(insert_rows)
             else:
                 break

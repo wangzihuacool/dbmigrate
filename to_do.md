@@ -27,3 +27,6 @@ show create database `tpcd`;
 13、打印每张表的同步耗时
 
 14、增加对postgresql的支持
+
+
+15、增加附带列名的插入，用于源库和目标库的表结构不完全一致的情况。（目前只在基于where条件的increment同步中实现 -20200618）
