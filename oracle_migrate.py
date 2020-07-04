@@ -40,6 +40,7 @@ class OracleSource(object):
     def source_table_check(self, *source_tables):
         res_tables = self.OracleSourceConn.execute('select lower(table_name) as table_name from user_tables order by table_name')
         all_table_list = [table[0] for table in res_tables]
+        source_tables = list(map(lambda x: x.lower(), source_tables))
         if source_tables:
             if set(all_table_list) >= set(source_tables):
                 from_tables = source_tables

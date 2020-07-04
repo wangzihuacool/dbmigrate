@@ -281,7 +281,8 @@ class MysqlTarget(object):
                 default_defination = 'default null'
             else:
                 default_defination = ''
-            extra_defination = res_row.get('extra') if res_row.get('extra') else ''
+            # mysql 8.0之后针对default值的列，show columns会在extra中生成DEFAULT_GENERATED关键字导致后续创建表报错，替换DEFAULT_GENERATED关键字，added by wl_lw at 20200704
+            extra_defination = res_row.get('extra').replace('DEFAULT_GENERATED', '') if res_row.get('extra') else ''
             # 增加comment内容转义，消除其中的特殊字符的影响 modified at 202001007
             # comment_defination = ('comment "' + res_row.get('comment') + '"') if res_row.get('comment') else ''
             value = escape_string(res_row.get('comment'))
