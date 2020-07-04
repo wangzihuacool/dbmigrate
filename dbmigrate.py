@@ -736,7 +736,7 @@ def dbm_version(current_release=None):
 # 主程序
 if __name__ == '__main__':
     # 增加版本标识
-    current_release = 20200618
+    current_release = 20200704
     dbm_version(current_release=current_release)
 
     # 参数
