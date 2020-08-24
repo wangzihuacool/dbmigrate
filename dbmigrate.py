@@ -700,6 +700,59 @@ def oracle_to_mysql():
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
             # 同步后启用外键
             mysql_target.mysql_target_execute('set foreign_key_checks=1')
+        # 带where条件的同步
+        elif content == 'increment':
+            # 同步数据前禁用外键
+            mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            for from_table in from_tables:
+                from_table = from_table.lower()
+                res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table(
+                    from_table)
+                index_column_info = oracle_source.oracle_source_index(from_table)
+                # 检查目标表是否已存在
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # 先truncate目标表，然后追加数据
+                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
+                    # 同步数据, 源库是oracle，执行OracleDataMigrate，增量同步目前只支持串行
+                    oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                        total_rows = oracle_dbm.oracle_incr_serial_migrate(from_table, to_table,
+                                                                           incremental_method=incremental_method,
+                                                                           where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print(
+                            '[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 同步数据, 源库是oracle，执行OracleDataMigrate，增量同步目前只支持串行
+                    oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                        total_rows = oracle_dbm.oracle_incr_serial_migrate(from_table, to_table,
+                                                                           incremental_method=incremental_method,
+                                                                           where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print(
+                            '[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+            # 同步后启用外键
+            mysql_target.mysql_target_execute('set foreign_key_checks=1')
         else:
             print("[DBM] error 999 : 目前Oracle->Mysql的数据库同步只支持表级别的同步!")
             sys.exit(1)
@@ -736,7 +789,7 @@ def dbm_version(current_release=None):
 # 主程序
 if __name__ == '__main__':
     # 增加版本标识
-    current_release = 20200704
+    current_release = 20200824
     dbm_version(current_release=current_release)
 
     # 参数

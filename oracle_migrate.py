@@ -486,6 +486,25 @@ class OracleDataMigrate(object):
             final_parallel = min(parallel, max_parallel)
         return parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag
 
+    # 源库为oracle时的增量数据同步串行处理方法
+    def oracle_incr_serial_migrate(self, from_table, to_table, incremental_method=None, where_clause=None):
+        print('[DBM] Inserting data into table `' + to_table + '`')
+        sql_select_original = 'select * from ' + from_table + ' t'
+        sql_select = sql_select_original + ' ' + where_clause if incremental_method == 'where' else sql_select_original
+        # 串行获取数据,每批10w行
+        res_data_incr = self.oracle_source.oracle_source_data_incr(sql_select)
+        sql_columns = self.oracle_source.oracle_source_columns(sql_select)
+        insert_rows_list = []
+        while True:
+            data_incr = next(res_data_incr)
+            if data_incr:
+                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr, columns=sql_columns)
+                insert_rows_list.append(insert_rows)
+            else:
+                break
+        total_rows = reduce(lambda x, y: x + y, insert_rows_list) if insert_rows_list else 0
+        return total_rows
+
 
 if __name__ == '__main__':
     source_db_info = {'host': '172.20.221.180', 'port': 1522, 'db': 'monitor', 'user': 'emlog',
