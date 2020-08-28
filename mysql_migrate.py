@@ -274,7 +274,9 @@ class MysqlTarget(object):
                 value_default = escape_string(res_row.get('default'))
                 default_defination = 'default "' + value_default + '"'
             elif res_row.get('default') and not (res_row.get('type').lower().startswith('char') or res_row.get('type').lower().startswith('varchar') or res_row.get('type').lower().startswith('text') or res_row.get('type').lower().startswith('enum')):
-                default_defination = 'default ' + res_row.get('default')
+                value_default = escape_string(res_row.get('default'))
+                default_defination = 'default ' + res_row.get('default') if not value_default.startswith(
+                    '0000') else 'default "' + res_row.get('default') + '"'
             elif res_row.get('default') == '':
                 default_defination = 'default ""'
             elif not res_row.get('default') and res_row.get('null') == 'YES':
