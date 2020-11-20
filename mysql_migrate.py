@@ -720,12 +720,12 @@ class MysqlDataMigrate(object):
         parallel_method = 'multiprocess'
         max_parallel = cpu_count()
 
-        #计算实际并发数=用户指定并发数；如未指定，实际并发数=round(表记录数/10w)
+        #计算实际并发数=用户指定并发数(用户指定并发数最大为cpu*2；如未指定，实际并发数=round(表记录数/10w)
         if parallel == 0:
             auto_parallel = round(int(res_tablestatus[0].get('rows'))/100000)
             final_parallel = max(min(auto_parallel, max_parallel), 1)
         else:
-            final_parallel = min(parallel, max_parallel)
+            final_parallel = min(parallel, max_parallel*2)
         return parallel_flag, final_parallel, parallel_key, parallel_method
 
     # 源库是mysql时的增量数据同步串行处理方法
