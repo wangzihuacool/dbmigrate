@@ -319,7 +319,7 @@ class MysqlTarget(object):
 
     # 创建索引(不包含主键)
     # @performance
-    def msyql_target_index(self, to_table, index_column_info):
+    def mysql_target_index(self, to_table, index_column_info):
         print('[DBM] Create index on table `' + to_table + '`')
         all_indexes_defination = []
         for j in index_column_info:
@@ -423,7 +423,7 @@ class MysqlTarget(object):
         affect_rows = self.MysqlTargetDb.mysql_execute_no_trans(sql)
         return affect_rows
 
-    def mysql_target_close(self):
+    def close(self):
         self.MysqlTargetDb.close()
 
 
@@ -601,6 +601,8 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
         insert_rows = multi_db_target.insert_target_data(to_table, sql_data, columns=sql_columns)
         insert_rows_list.append(insert_rows)
     total_rows = reduce(lambda x, y: x + y, insert_rows_list)
+    mysql_source.mysql_source_close()
+    multi_db_target.close()
     return total_rows
 
 

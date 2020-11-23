@@ -241,6 +241,9 @@ class OracleSource(object):
         pass
         # to_do
 
+    def close(self):
+        self.OracleSourceConn.close()
+
 
 # 目标库为oracle时装载数据
 class OracleTarget(object):
@@ -323,7 +326,7 @@ class OracleTarget(object):
         affect_rows = self.OracleTargetConn.executedml(sql)
         return affect_rows
 
-    def oracle_target_close(self):
+    def close(self):
         self.OracleTargetConn.close()
 
 
@@ -369,6 +372,8 @@ def oracle_select_insert(sql_info, source_db_info, target_db_info):
         insert_rows = multi_db_target.insert_target_data(to_table, sql_data, columns=sql_columns)
         insert_rows_list.append(insert_rows)
     total_rows = reduce(lambda x, y: x + y, insert_rows_list)
+    oracle_source.close()
+    multi_db_target.close()
     return total_rows
 
 
