@@ -404,8 +404,8 @@ class MysqlTarget(object):
             if not columns:
                 insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '` values (' + value_str + ')'
             else:
-                column_str = ','.join(columns)
-                insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '`(' + column_str + ') values (' + value_str + ')'
+                column_str = '`,`'.join(columns)
+                insert_sql = 'insert into `' + self.to_db + '`.`' + to_table + '`(`' + column_str + '`) values (' + value_str + ')'
             # 默认情况下，自增列插入0或null时，该列使用auto_increment自增；修改sql_mode使得插入0时就插入数字0，以匹配阿里云的配置。
             self.MysqlTargetDb.mysql_execute_no_trans("set sql_mode='NO_AUTO_VALUE_ON_ZERO'")
             data_rows = self.MysqlTargetDb.mysql_executemany(insert_sql, data)
