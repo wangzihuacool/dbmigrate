@@ -61,10 +61,11 @@ def mysql_db_migrate_parallel_subprocess(task_queue, source_db_info, target_db_i
             break
         table_name = task_queue.get()
         try:
-            current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
-            print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' is migrating table ' + table_name + '.')
+            # current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            # print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' is migrating table ' + table_name + '.')
             mysql_db_all_migrate(table_name, source_db_info, target_db_info, p_mysql_source=mysql_source, p_mysql_target=mysql_target)
-            print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' finish migrating table ' + table_name + '.')
+            # current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            # print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' finish migrating table ' + table_name + '.')
         except:
             print('[DBM] Error: table ' + table_name + ' migrate failed')
             traceback.print_exc()
@@ -925,7 +926,8 @@ if __name__ == '__main__':
 
     # 参数
     begin_time = time.time()
-    print('DBM开始同步: source_db:' + source_host + ':' + str(
+    current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print(current_time + ' DBM开始同步: source_db:' + source_host + ':' + str(
         source_port) + '/' + source_db + ' => ' + 'target_db:' + target_host + ':' + str(target_port) + '/' + target_db)
     source_db_type = source_db_type
     target_db_type = target_db_type
@@ -954,7 +956,8 @@ if __name__ == '__main__':
     elif source_db_type == 'oracle' and target_db_type == 'mysql':
         oracle_to_mysql()
     end_time = time.time()
-    print('DBM同步完成,共耗时:' + str(round(end_time - begin_time)) + 's')
+    current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    print(current_time + ' DBM同步完成,共耗时:' + str(round(end_time - begin_time)) + 's')
 
 
 
