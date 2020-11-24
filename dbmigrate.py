@@ -897,7 +897,7 @@ def dbm_version(current_release=None):
     if current_release:
         release_url = 'http://172.20.222.218:9003/dbm_check_version?current_release=' + str(current_release)
         update1_url = 'http://172.20.222.218:9003/dbm_latest_version/dbmigrate'
-        update2_url = 'http://172.20.222.218:9003/dbm_latest_version/dbmigrate.conf.sample'
+        update2_url = 'http://172.20.222.218:9003/dbm_latest_version/dbmigrate.conf'
         try:
             resp = requests.get(release_url)
             if resp.status_code == 444:
