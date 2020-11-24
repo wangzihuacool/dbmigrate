@@ -206,13 +206,13 @@ class MysqlSource(object):
         from_events = [event[0] for event in res_events]
         return from_views_ddl, from_views_tmp_ddl, from_procedures_ddl, from_functions_ddl, from_routines, from_events
 
-    def mysql_source_close(self):
+    def close(self):
         self.MysqlDb.close()
 
 
 # 目标为mysql时写入数据
 class MysqlTarget(object):
-    # 检查目标库连接
+    # 建立目标库连接,模式关闭外键，退出时开启外键
     def __init__(self, **target_db_info):
         # self.new_db_info = copy.deepcopy(target_db_info)
         # new_db_info['db'] = None
@@ -220,6 +220,7 @@ class MysqlTarget(object):
             self.MysqlTargetDb = MysqlOperate(**target_db_info)
             self.to_db = target_db_info.get('db')
             self.MysqlTargetDb.mysql_execute('use %s' % self.to_db)
+            self.MysqlTargetDb.mysql_execute_no_trans('set foreign_key_checks=0')
         except Exception as e:
             print('DBM Error: can not connect to target db: ' + target_db_info.get('host') + ':' +
                   str(target_db_info.get('port')) + '/' + target_db_info.get('db'))
@@ -423,7 +424,16 @@ class MysqlTarget(object):
         affect_rows = self.MysqlTargetDb.mysql_execute_no_trans(sql)
         return affect_rows
 
+    # 禁用mysql外键
+    def mysql_target_disable_fk(self):
+        self.MysqlTargetDb.mysql_execute('set foreign_key_checks=0')
+
+    # 启用mysql外键
+    def mysql_target_enable_fk(self):
+        self.MysqlTargetDb.mysql_execute('set foreign_key_checks=1')
+
     def close(self):
+        self.MysqlTargetDb.mysql_execute_no_trans('set foreign_key_checks=1')
         self.MysqlTargetDb.close()
 
 
@@ -601,7 +611,7 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
         insert_rows = multi_db_target.insert_target_data(to_table, sql_data, columns=sql_columns)
         insert_rows_list.append(insert_rows)
     total_rows = reduce(lambda x, y: x + y, insert_rows_list)
-    mysql_source.mysql_source_close()
+    mysql_source.close()
     multi_db_target.close()
     return total_rows
 
@@ -757,3 +767,7 @@ class MysqlDataMigrate(object):
                 break
         total_rows = reduce(lambda x, y: x + y, insert_rows_list) if insert_rows_list else 0
         return total_rows
+
+    def close(self):
+        self.mysql_source.close()
+        self.multi_db_target.close()

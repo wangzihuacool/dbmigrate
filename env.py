@@ -45,6 +45,9 @@ target_tables = conf.get('target_tables')
 # section：通用配置
 content = conf.get('content')
 parallel = conf.get('parallel')
+performance_mode = conf.get('performance_mode')
 table_exists_action = conf.get('table_exists_action')
 incremental_method = conf.get('incremental_method')
 where_clause = conf.get('where_clause')
+# section: 软件配置
+auto_upgrade = conf.get('auto_upgrade')

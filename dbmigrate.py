@@ -8,9 +8,84 @@ NOTE: 增加mysql的基于where条件的增量数据同步 updated by wl_lw at 2
 import traceback
 import time, sys, os, stat
 import requests
+from math import ceil, floor
+from multiprocessing import cpu_count, Process, Pool, freeze_support, Manager
+from functools import reduce, partial
 from env import *
 from mysql_migrate import MysqlSource, MysqlTarget, MysqlDataMigrate, MysqlMetadataMapping
 from oracle_migrate import OracleSource, OracleTarget, OracleDataMigrate
+
+
+# mysql -> mysql 数据库级别同步(全库元数据+数据)基础同步方法
+def mysql_db_all_migrate(from_table, source_db_info, target_db_info, p_mysql_source=None, p_mysql_target=None):
+    mysql_source = MysqlSource(**source_db_info) if not p_mysql_source else p_mysql_source
+    mysql_target = MysqlTarget(**target_db_info) if not p_mysql_target else p_mysql_target
+    res_tablestatus, res_createtable, res_columns, res_triggers = mysql_source.mysql_source_table(from_table)
+    index_column_info = mysql_source.mysql_source_index(from_table)
+    # 目标表
+    exist_table_list = mysql_target.mysql_target_exist_tables()
+    to_table = from_table
+    # 标准处理
+    # 创建表
+    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
+                                    res_tablestatus=res_tablestatus)
+    # 创建索引
+    mysql_target.mysql_target_index(to_table, index_column_info)
+    # 同步数据
+    mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
+    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
+                                                                                                 res_tablestatus,
+                                                                                                 res_columns,
+                                                                                                 parallel=parallel)
+    if parallel_flag == 0:
+        total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
+    else:
+        total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel, parallel_key=parallel_key,
+                                                      parallel_method=parallel_method)
+    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+    # trigger同步
+    # to_do
+    if not p_mysql_source:
+        mysql_source.close()
+    if not p_mysql_target:
+        mysql_target.close()
+
+
+# mysql -> mysql 数据库同步时表并行同步的处理方法
+def mysql_db_migrate_parallel_subprocess(task_queue, source_db_info, target_db_info):
+    mysql_source = MysqlSource(**source_db_info)
+    mysql_target = MysqlTarget(**target_db_info)
+    # 接受queue队列中的table进行处理
+    while True:
+        if task_queue.empty():
+            break
+        table_name = task_queue.get()
+        try:
+            current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+            print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' is migrating table ' + table_name + '.')
+            mysql_db_all_migrate(table_name, source_db_info, target_db_info, p_mysql_source=mysql_source, p_mysql_target=mysql_target)
+            print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' finish migrating table ' + table_name + '.')
+        except:
+            print('[DBM] Error: table ' + table_name + ' migrate failed')
+            traceback.print_exc()
+            continue
+        task_queue.task_done()
+    # mysql_source.close()
+    # mysql_target.close()
+
+
+# mysql -> mysql 数据库同步时表并行同步的调度方法
+def mysql_db_migrate_parallel_schedule(task_list, num_of_processes=2):
+    manager = Manager()
+    task_queue = manager.Queue()
+    for task in task_list:
+        task_queue.put(task)
+    for n in range(num_of_processes):
+        p = Process(target=mysql_db_migrate_parallel_subprocess, args=(task_queue, source_db_info, target_db_info))
+        p.start()
+    print('[DBM] Enable parallel job for dbmigrate, parallel num is ' + str(num_of_processes) + '.')
+    task_queue.join()
+    p.join()
 
 
 # mysql -> mysql 数据库同步
@@ -22,36 +97,30 @@ def mysql_to_mysql():
     from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables, content=content)
     mysql_target.mysql_target_createdb(migrate_granularity, **target_db_info)
     target_tables = from_tables
-    mysql_target.mysql_target_execute('set foreign_key_checks=0')
+    mysql_source.close()
+    mysql_target.close()
 
     # mysql -> mysql 数据库级别同步
     if migrate_granularity == 'db':
         # 同步全库所有元数据+数据
         if content == 'all':
-            #表同步
-            for from_table in from_tables:
-                res_tablestatus, res_createtable, res_columns, res_triggers = mysql_source.mysql_source_table(from_table)
-                index_column_info = mysql_source.mysql_source_index(from_table)
-                # 目标表
-                exist_table_list = mysql_target.mysql_target_exist_tables()
-                to_table = from_table
-                #标准处理
-                #创建表
-                mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
-                                                res_tablestatus=res_tablestatus)
-                #创建索引
-                mysql_target.msyql_target_index(to_table, index_column_info)
-                #同步数据
-                mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table, res_tablestatus, res_columns, parallel=parallel)
-                if parallel_flag == 0:
-                    total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
-                else:
-                    total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel, parallel_key=parallel_key, parallel_method=parallel_method)
-                print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
-
-                # trigger同步
-                # to_do
+            # 表同步(根据是否开启性能模式来选择是否需要表之间并行同步，开启表并行时默认最大并发为8，也可手动设置)
+            # 动态计算表迁移并行度
+            if performance_mode and performance_mode == 1:
+                table_parallel = int(min(round(len(from_tables)/50), cpu_count()/2, 8))
+                # n = ceil(len(from_tables)/table_parallel)
+                # from_tables_list = [from_tables[i:i+n] for i in range(0, len(from_tables), n)]
+                mysql_db_migrate_parallel_schedule(from_tables, table_parallel)
+            # 手动指定表迁移并行度
+            elif performance_mode and performance_mode > 1:
+                table_parallel = performance_mode
+                mysql_db_migrate_parallel_schedule(from_tables, table_parallel)
+            # 不使用表迁移并行
+            else:
+                for from_table in from_tables:
+                    mysql_db_all_migrate(from_table, source_db_info, target_db_info, mysql_source=mysql_source, mysql_target=mysql_target)
+            mysql_source = MysqlSource(**source_db_info)
+            mysql_target = MysqlTarget(**target_db_info)
             # 外键同步
             final_fk = mysql_source.mysql_source_fk(from_tables)
             mysql_target.mysql_target_fk(final_fk)
@@ -64,9 +133,13 @@ def mysql_to_mysql():
                 mysql_target.mysql_target_procedure(from_procedures_ddl)
             if from_functions_ddl:
                 mysql_target.mysql_target_procedure(from_functions_ddl)
+            mysql_source.close()
+            mysql_target.close()
 
         elif content == 'metadata':
             # 表同步
+            mysql_source = MysqlSource(**source_db_info)
+            mysql_target = MysqlTarget(**target_db_info)
             for from_table in from_tables:
                 res_tablestatus, res_createtable, res_columns, res_triggers = mysql_source.mysql_source_table(from_table)
                 index_column_info = mysql_source.mysql_source_index(from_table)
@@ -78,7 +151,7 @@ def mysql_to_mysql():
                 mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
                                                 res_tablestatus=res_tablestatus)
                 # 创建索引
-                mysql_target.msyql_target_index(to_table, index_column_info)
+                mysql_target.mysql_target_index(to_table, index_column_info)
 
                 # trigger同步
                 # to_do
@@ -97,6 +170,8 @@ def mysql_to_mysql():
                 mysql_target.mysql_target_procedure(from_procedures_ddl)
             if from_functions_ddl:
                 mysql_target.mysql_target_function(from_functions_ddl)
+            mysql_source.close()
+            mysql_target.close()
 
         # 同步全库所有表非主键索引
         elif content == 'index':
@@ -109,7 +184,7 @@ def mysql_to_mysql():
             #    to_table = from_table
             #    if to_table in exist_table_list:
             #        mysql_target.mysql_drop_index(to_table)
-            #        mysql_target.msyql_target_index(to_table, index_column_info)
+            #        mysql_target.mysql_target_index(to_table, index_column_info)
 
         elif content == 'data':
             print('[DBM] Error 100 : 参数错误，content=\'data\' 仅适用于表同步.')
@@ -119,6 +194,8 @@ def mysql_to_mysql():
             sys.exit(1)
     # mysql -> mysql 表级别同步
     elif migrate_granularity == 'table':
+        mysql_source = MysqlSource(**source_db_info)
+        mysql_target = MysqlTarget(**target_db_info)
         # 同步所有表元数据+数据
         if content == 'all':
             #表同步
@@ -135,7 +212,7 @@ def mysql_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
                                                     res_tablestatus=res_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, index_column_info)
+                    mysql_target.mysql_target_index(to_table, index_column_info)
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
@@ -189,7 +266,7 @@ def mysql_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
                                                     res_tablestatus=res_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, index_column_info)
+                    mysql_target.mysql_target_index(to_table, index_column_info)
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
@@ -230,7 +307,7 @@ def mysql_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
                                                     res_tablestatus=res_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, index_column_info)
+                    mysql_target.mysql_target_index(to_table, index_column_info)
 
                     # trigger同步
                     # to_do
@@ -247,7 +324,7 @@ def mysql_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
                                                     res_tablestatus=res_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, index_column_info)
+                    mysql_target.mysql_target_index(to_table, index_column_info)
 
                     # trigger同步
                     # to_do
@@ -314,7 +391,7 @@ def mysql_to_mysql():
                 to_table = from_table
                 if to_table in exist_table_list:
                     mysql_target.mysql_drop_index(to_table)
-                    mysql_target.msyql_target_index(to_table, index_column_info)
+                    mysql_target.mysql_target_index(to_table, index_column_info)
 
         elif content == 'increment':
             # 增量同步表数据, added by wl_lw at 20200411
@@ -365,11 +442,11 @@ def mysql_to_mysql():
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
         else:
             print('[DBM] error 100 : content=%s 参数错误.' % content)
+        mysql_source.close()
+        mysql_target.close()
     else:
         print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
         sys.exit(1)
-    # 恢复约束
-    mysql_target.mysql_target_execute('set foreign_key_checks=1')
 
 
 # mysql -> oracle 数据库同步
@@ -582,8 +659,8 @@ def oracle_to_mysql():
     elif migrate_granularity == 'table':
         # oracle->mysql表同步
         if content == 'all':
-            # 同步数据前禁用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            # 同步数据前禁用外键，在MysqlTarget类初始化时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=0')
             # 先同步元数据
             source_type = source_db_info.get('source_db_type')
             res_pk, res_fk = oracle_source.oracle_source_pk_fk(from_tables)
@@ -608,7 +685,7 @@ def oracle_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
                                                     res_tablestatus=mysql_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    mysql_target.mysql_target_index(to_table, mysql_indexes)
                     # oracle->mysql的trigger同步(需要么?)
                     # to_do
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
@@ -625,7 +702,7 @@ def oracle_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
                                                     res_tablestatus=mysql_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    mysql_target.mysql_target_index(to_table, mysql_indexes)
                     # oracle->mysql的trigger同步(需要么?)
                     # to_do
                 else:
@@ -647,13 +724,13 @@ def oracle_to_mysql():
             # 外键同步
             mysql_fk = MysqlMetadataMapping.fk_convert(res_fk)
             mysql_target.mysql_target_fk(mysql_fk)
-            # 同步后启用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=1')
+            # 同步后启用外键, 在MysqlTarge类关闭时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=1')
 
         # 表的元数据同步
         elif content == 'metadata':
-            # 同步数据前禁用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            # 同步数据前禁用外键，在MysqlTarget类初始化时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=0')
             source_type = source_db_info.get('source_db_type')
             res_pk, res_fk = oracle_source.oracle_source_pk_fk(from_tables)
             for from_table in from_tables:
@@ -677,7 +754,7 @@ def oracle_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
                                                     res_tablestatus=mysql_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    mysql_target.mysql_target_index(to_table, mysql_indexes)
                     # oracle->mysql的trigger同步(需要么?)
                     # to_do
                 elif to_table in exist_table_list and table_exists_action == 'truncate':
@@ -693,7 +770,7 @@ def oracle_to_mysql():
                     mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=mysql_columns,
                                                     res_tablestatus=mysql_tablestatus)
                     # 创建索引
-                    mysql_target.msyql_target_index(to_table, mysql_indexes)
+                    mysql_target.mysql_target_index(to_table, mysql_indexes)
                     # oracle->mysql的trigger同步(需要么?)
                     # to_do
                 else:
@@ -702,13 +779,13 @@ def oracle_to_mysql():
             # 外键同步
             mysql_fk = MysqlMetadataMapping.fk_convert(res_fk)
             mysql_target.mysql_target_fk(mysql_fk)
-            # 同步后启用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=1')
+            # 同步后启用外键, 在MysqlTarge类关闭时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=1')
 
         # 只同步表数据
         elif content == 'data':
-            # 同步数据前禁用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            # 同步数据前禁用外键，在MysqlTarget类初始化时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=0')
             for from_table in from_tables:
                 from_table = from_table.lower()
                 res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table(from_table)
@@ -751,12 +828,12 @@ def oracle_to_mysql():
                     print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
-            # 同步后启用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=1')
+            # 同步后启用外键, 在MysqlTarge类关闭时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=1')
         # 带where条件的同步
         elif content == 'increment':
-            # 同步数据前禁用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            # 同步数据前禁用外键，在MysqlTarget类初始化时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=0')
             for from_table in from_tables:
                 from_table = from_table.lower()
                 res_tablestatus, res_partitions, res_columns, res_triggers, res_segments = oracle_source.oracle_source_table(
@@ -804,8 +881,8 @@ def oracle_to_mysql():
                     print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
-            # 同步后启用外键
-            mysql_target.mysql_target_execute('set foreign_key_checks=1')
+            # 同步后启用外键, 在MysqlTarge类关闭时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=1')
         else:
             print("[DBM] error 999 : 目前Oracle->Mysql的数据库同步只支持表级别的同步!")
             sys.exit(1)
@@ -842,8 +919,9 @@ def dbm_version(current_release=None):
 # 主程序
 if __name__ == '__main__':
     # 增加版本标识
-    current_release = 20200824
-    dbm_version(current_release=current_release)
+    if not (auto_upgrade and (auto_upgrade == 0 or auto_upgrade == '0')):
+        current_release = 20201124
+        dbm_version(current_release=current_release)
 
     # 参数
     begin_time = time.time()
