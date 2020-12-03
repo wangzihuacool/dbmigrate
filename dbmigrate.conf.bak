@@ -4,7 +4,7 @@
 #            source_tables = ['test'], content = 'increment', table_exists_action = 'truncate', incremental_method = 'where', where_clause = 'where id > 1'
 
 #源库
-source_db_type = 'mysql'
+source_db_type = 'mysql'                                              # 源库类型(目前支持oracle/mysql/mssql)
 source_host = '172.16.xx.xx'
 source_port = 3306
 source_db = 'xxxx'
