@@ -14,6 +14,7 @@ from functools import reduce, partial
 from env import *
 from mysql_migrate import MysqlSource, MysqlTarget, MysqlDataMigrate, MysqlMetadataMapping
 from oracle_migrate import OracleSource, OracleTarget, OracleDataMigrate
+from mssql_migrate import MssqlSource, MssqlTarget, MssqlDataMigrate
 
 
 # mysql -> mysql 数据库级别同步(全库元数据+数据)基础同步方法
@@ -556,7 +557,7 @@ def oracle_to_oracle():
                     # 同步数据, 源库是oracle，执行OracleDataMigrate
                     oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag = oracle_dbm.oracle_parallel_flag(
-                        from_table, index_column_info, res_columns, res_segments, parallel=0)
+                        from_table, index_column_info, res_columns, res_segments, parallel=parallel)
                     if parallel_flag == 0:
                         total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
                     else:
@@ -713,7 +714,7 @@ def oracle_to_mysql():
                 # 同步数据, 源库是oracle，执行OracleDataMigrate
                 oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
                 parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag = oracle_dbm.oracle_parallel_flag(
-                    from_table, index_column_info, res_columns, res_segments, parallel=0)
+                    from_table, index_column_info, res_columns, res_segments, parallel=parallel)
                 if parallel_flag == 0:
                     total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
                 else:
@@ -803,7 +804,7 @@ def oracle_to_mysql():
                     # 同步数据, 源库是oracle，执行OracleDataMigrate
                     oracle_dbm = OracleDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method, lob_flag = oracle_dbm.oracle_parallel_flag(
-                        from_table, index_column_info, res_columns, res_segments, parallel=0)
+                        from_table, index_column_info, res_columns, res_segments, parallel=parallel)
                     if parallel_flag == 0:
                         total_rows = oracle_dbm.oracle_serial_migrate(from_table, to_table)
                     else:
@@ -856,6 +857,7 @@ def oracle_to_mysql():
                             print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
                         elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
                             print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                            sys.exit(1)
                         total_rows = oracle_dbm.oracle_incr_serial_migrate(from_table, to_table,
                                                                            incremental_method=incremental_method,
                                                                            where_clause=where_clause)
@@ -871,6 +873,7 @@ def oracle_to_mysql():
                             print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
                         elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
                             print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                            sys.exit(1)
                         total_rows = oracle_dbm.oracle_incr_serial_migrate(from_table, to_table,
                                                                            incremental_method=incremental_method,
                                                                            where_clause=where_clause)
@@ -886,6 +889,251 @@ def oracle_to_mysql():
             # mysql_target.mysql_target_execute('set foreign_key_checks=1')
         else:
             print("[DBM] error 999 : 目前Oracle->Mysql的数据库同步只支持表级别的同步!")
+            sys.exit(1)
+    else:
+        print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
+        sys.exit(1)
+
+
+# mssql -> oracle 数据库同步
+def mssql_to_oracle():
+    # 检查源库mssql和目标库oracle, 检查源表是否存在
+    mssql_source = MssqlSource(**source_db_info)
+    oracle_target = OracleTarget(**target_db_info)
+    from_tables, migrate_granularity = mssql_source.source_table_check(*source_tables)
+    to_tables = from_tables
+
+    # mssql -> oracle 数据库级别同步
+    if migrate_granularity == 'db':
+        print("[DBM] error 999 : 目前Mssql->Oracle的数据库同步只支持表级别的数据同步(content='data')!")
+        sys.exit(1)
+    # mssql -> oracle 表级别同步
+    elif migrate_granularity == 'table':
+        # 只同步表数据
+        if content == 'data':
+            # 同步数据前禁用外键
+            sql_enable_constraints = oracle_target.oracle_disable_constraint(to_tables)
+            for from_table in from_tables:
+                from_table = from_table.lower()
+                res_tablestatus, res_columns = mssql_source.mssql_source_table(from_table)
+                index_column_info = mssql_source.mssql_source_index(from_table)
+                # 检查目标表是否已存在
+                exist_table_list = oracle_target.oracle_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # 先truncate目标表，然后追加数据
+                    truncate_sql = 'truncate table ' + to_table
+                    oracle_target.oracle_execute_dml(truncate_sql)
+                    # 同步数据, 源库是mssql，执行MssqlDataMigrate
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = mssql_dbm.mssql_parallel_flag(
+                        from_table, index_column_info, res_tablestatus, res_columns, parallel=parallel)
+                    if parallel_flag == 0:
+                        total_rows = mssql_dbm.mssql_serial_migrate(from_table, to_table)
+                    else:
+                        total_rows = mssql_dbm.mssql_parallel_migrate(from_table, to_table, final_parallel,
+                                                                      parallel_key=parallel_key,
+                                                                      parallel_method=parallel_method)
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 数据追加到目标表
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = mssql_dbm.mssql_parallel_flag(
+                        from_table, index_column_info, res_tablestatus, res_columns, parallel=parallel)
+                    if parallel_flag == 0:
+                        total_rows = mssql_dbm.mssql_serial_migrate(from_table, to_table)
+                    else:
+                        total_rows = mssql_dbm.mssql_parallel_migrate(from_table, to_table, final_parallel,
+                                                                      parallel_key=parallel_key,
+                                                                      parallel_method=parallel_method)
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+            # 同步后启用外键
+            oracle_target.oracle_enable_constraint(sql_enable_constraints)
+        # 带where条件的同步
+        elif content == 'increment':
+            # 同步数据前禁用外键
+            sql_enable_constraints = oracle_target.oracle_disable_constraint(to_tables)
+            for from_table in from_tables:
+                from_table = from_table.lower()
+                res_tablestatus, res_columns = mssql_source.mssql_source_table(from_table)
+                index_column_info = mssql_source.mssql_source_index(from_table)
+                # 检查目标表是否已存在
+                exist_table_list = oracle_target.oracle_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # 先truncate目标表，然后追加数据
+                    truncate_sql = 'truncate table ' + to_table
+                    oracle_target.oracle_execute_dml(truncate_sql)
+                    # 同步数据, 源库是mssql，执行MssqlDataMigrate，增量同步目前只支持串行
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                            sys.exit(1)
+                        total_rows = mssql_dbm.mssql_incr_serial_migrate(from_table, to_table,
+                                                                         incremental_method=incremental_method,
+                                                                         where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print('[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                    mssql_dbm.close()
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 同步数据, 源库是mssql，执行MssqlDataMigrate，增量同步目前只支持串行
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                            sys.exit(1)
+                        total_rows = mssql_dbm.mssql_incr_serial_migrate(from_table, to_table,
+                                                                         incremental_method=incremental_method,
+                                                                         where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print(
+                            '[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                    mssql_dbm.close()
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+            # 同步后启用外键
+            oracle_target.oracle_enable_constraint(sql_enable_constraints)
+        else:
+            print("[DBM] error 999 : 目前Mssql->Oracle的数据库同步只支持表级别的数据同步(content='data' or content='increment')!")
+            sys.exit(1)
+    else:
+        print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
+        sys.exit(1)
+
+
+# mssql -> mysql 数据库同步
+def mssql_to_mysql():
+    # 检查源库mssql和目标库mysql, 检查源表是否存在
+    mssql_source = MssqlSource(**source_db_info)
+    mysql_target = MysqlTarget(**target_db_info)
+    from_tables, migrate_granularity = mssql_source.source_table_check(*source_tables)
+    to_tables = from_tables
+    # mssql -> mysql 数据库级别同步
+    if migrate_granularity == 'db':
+        print("[DBM] error 999 : 目前Mssql->Mysql的数据库同步只支持表级别的同步!")
+        sys.exit(1)
+    elif migrate_granularity == 'table':
+        # mssql->mysql表级别数据同步
+        if content == 'data':
+            # 同步数据前禁用外键，在MysqlTarget类初始化时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            for from_table in from_tables:
+                from_table = from_table.lower()
+                res_tablestatus, res_columns = mssql_source.mssql_source_table(from_table)
+                index_column_info = mssql_source.mssql_source_index(from_table)
+                # 检查目标表是否已存在
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # 先truncate目标表，然后追加数据
+                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
+                    # 同步数据, 源库是mssql，执行MssqlDataMigrate
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = mssql_dbm.mssql_parallel_flag(
+                        from_table, index_column_info, res_tablestatus, res_columns, parallel=parallel)
+                    if parallel_flag == 0:
+                        total_rows = mssql_dbm.mssql_serial_migrate(from_table, to_table)
+                    else:
+                        total_rows = mssql_dbm.mssql_parallel_migrate(from_table, to_table, final_parallel,
+                                                                      parallel_key=parallel_key,
+                                                                      parallel_method=parallel_method)
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 数据追加到目标表
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    parallel_flag, final_parallel, parallel_key, parallel_method = mssql_dbm.mssql_parallel_flag(
+                        from_table, index_column_info, res_tablestatus, res_columns, parallel=parallel)
+                    if parallel_flag == 0:
+                        total_rows = mssql_dbm.mssql_serial_migrate(from_table, to_table)
+                    else:
+                        total_rows = mssql_dbm.mssql_parallel_migrate(from_table, to_table, final_parallel,
+                                                                      parallel_key=parallel_key,
+                                                                      parallel_method=parallel_method)
+                    print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+            # 同步后启用外键, 在MysqlTarge类关闭时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=1')
+        # 带where条件的同步
+        elif content == 'increment':
+            # 同步数据前禁用外键，在MysqlTarget类初始化时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=0')
+            for from_table in from_tables:
+                from_table = from_table.lower()
+                res_tablestatus, res_columns = mssql_source.mssql_source_table(from_table)
+                index_column_info = mssql_source.mssql_source_index(from_table)
+                # 检查目标表是否已存在
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # 先truncate目标表，然后追加数据
+                    mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
+                    # 同步数据, 源库是mssql，执行MssqlDataMigrate，增量同步目前只支持串行
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                            sys.exit(1)
+                        total_rows = mssql_dbm.mssql_incr_serial_migrate(from_table, to_table,
+                                                                         incremental_method=incremental_method,
+                                                                         where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print('[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                    mssql_dbm.close()
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 同步数据, 源库是mssql，执行MssqlDataMigrate，增量同步目前只支持串行
+                    mssql_dbm = MssqlDataMigrate(source_db_info, target_db_info)
+                    if incremental_method == 'where':
+                        if not where_clause:
+                            print('[DBM] note 300: 增量同步方式为where，但未指定where_clause，将启用全量同步')
+                        elif not (where_clause.startswith('where') or where_clause.startswith('WHERE')):
+                            print('[DBM] error 100: 参数错误, where_clause=%s 参数错误，where_clause必须以where开头.' % where_clause)
+                            sys.exit(1)
+                        total_rows = mssql_dbm.mssql_incr_serial_migrate(from_table, to_table,
+                                                                         incremental_method=incremental_method,
+                                                                         where_clause=where_clause)
+                        print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
+                    else:
+                        print('[DBM] error 100 : 参数错误，incremental_method=%s 参数错误，目前仅支持where_clause方式.' % incremental_method)
+                    mssql_dbm.close()
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+            # 同步后启用外键, 在MysqlTarge类关闭时禁用外键
+            # mysql_target.mysql_target_execute('set foreign_key_checks=1')
+        else:
+            print("[DBM] error 999 : 目前Mssql->Mysql的数据库同步只支持表级别的同步!")
             sys.exit(1)
     else:
         print('[DBM] error 100: source_tables=%s 参数错误.' % source_tables)
@@ -920,8 +1168,9 @@ def dbm_version(current_release=None):
 # 主程序
 if __name__ == '__main__':
     # 增加版本标识
+    current_release = 20201203
+    print('dbmigrate version: ' + str(current_release))
     if not (auto_upgrade and (auto_upgrade == 0 or auto_upgrade == '0')):
-        current_release = 20201124
         dbm_version(current_release=current_release)
 
     # 参数
@@ -955,6 +1204,10 @@ if __name__ == '__main__':
         oracle_to_oracle()
     elif source_db_type == 'oracle' and target_db_type == 'mysql':
         oracle_to_mysql()
+    elif source_db_type == 'mssql' and target_db_type == 'oracle':
+        mssql_to_oracle()
+    elif source_db_type == 'mssql' and target_db_type == 'mysql':
+        mssql_to_mysql()
     end_time = time.time()
     current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
     print(current_time + ' DBM同步完成,共耗时:' + str(round(end_time - begin_time)) + 's')

@@ -1,7 +1,7 @@
 # -*- code: utf-8 -*-
 
 '''
-mysql迁移源库和目标库类
+oracle迁移源库和目标库类
 '''
 import traceback
 from operator import itemgetter
@@ -439,7 +439,7 @@ class OracleDataMigrate(object):
             # print(insert_rows)
             # print(total_rows)
         else:
-        # 多线程
+            # 多线程
             thread_list = []
             result_list = []
             for t in range(final_parallel):
@@ -512,8 +512,8 @@ class OracleDataMigrate(object):
 
 
 if __name__ == '__main__':
-    source_db_info = {'host': '172.20.221.180', 'port': 1522, 'db': 'monitor', 'user': 'emlog',
-                      'password': 'emlog123', 'charset': 'utf8', 'source_db_type': 'oracle'}
+    source_db_info = {'host': '172.20.xx.xx', 'port': 1521, 'db': 'xx', 'user': 'xx',
+                      'password': 'xxx', 'charset': 'utf8', 'source_db_type': 'oracle'}
     oracleconnect = OracleSource(**source_db_info)
     index_column_info = oracleconnect.oracle_source_index('DBM_SYSTIME')
     print(index_column_info)

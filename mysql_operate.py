@@ -177,7 +177,7 @@ class MysqlOperateIncr(MysqlOperate):
 
 # main
 if __name__ == "__main__":
-    mysql_info = {'host': '172.20.227.35', 'port': 3306, 'db': 'information_schema', 'user': 'root', 'password': 'frPxYRVX67dE', 'charset': 'utf8'}
+    mysql_info = {'host': '172.20.xx.xx', 'port': 3306, 'db': 'information_schema', 'user': 'xx', 'password': 'xx', 'charset': 'utf8'}
     MysqlDb = MysqlOperate(**mysql_info)
     res = MysqlDb.mysql_select('select * from sbench.sbtest1 order by id limit 2')
     print(res)
