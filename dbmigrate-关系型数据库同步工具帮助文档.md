@@ -58,7 +58,7 @@ incremental_method        - 获取增量数据的方式，[where] - 自定义whe
 
 where_clause              - 获取增量数据时的查询条件,仅当content='increment'和incremental_method='where'时生效
 
-auto_upgrade              - 是否自动升级版本,建议值：1，自动更新以及时修复bug和增强功能；仅dbmigrate作为后台任务执行时可设置为0
+silent_mode               - 是否静默模式，默认为0即非静默模式，dbmigrate作为后台任务执行时可设置为1
 ```
 
 ## 配置示例：
@@ -93,6 +93,6 @@ incremental_method = 'where'
 where_clause = 'where create_time >= date_sub(curdate(), interval 2 day)'   
 
 #软件配置
-auto_upgrade = 1                                                      
+silent_mode = 0
 ```
 

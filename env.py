@@ -50,4 +50,4 @@ table_exists_action = conf.get('table_exists_action')
 incremental_method = conf.get('incremental_method')
 where_clause = conf.get('where_clause')
 # section: 软件配置
-auto_upgrade = conf.get('auto_upgrade')
+silent_mode = conf.get('silent_mode')

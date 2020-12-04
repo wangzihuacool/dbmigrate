@@ -97,7 +97,7 @@ def mysql_to_mysql():
     mysql_target = MysqlTarget(**target_db_info)
     mysql_source.source_db_check()
     from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables, content=content)
-    mysql_target.mysql_target_createdb(migrate_granularity, **target_db_info)
+    mysql_target.mysql_target_createdb(migrate_granularity, silent_mode=silent_mode, **target_db_info)
     target_tables = from_tables
     mysql_source.close()
     mysql_target.close()
@@ -120,7 +120,7 @@ def mysql_to_mysql():
             # 不使用表迁移并行
             else:
                 for from_table in from_tables:
-                    mysql_db_all_migrate(from_table, source_db_info, target_db_info, mysql_source=mysql_source, mysql_target=mysql_target)
+                    mysql_db_all_migrate(from_table, source_db_info, target_db_info, p_mysql_source=None, p_mysql_target=None)
             mysql_source = MysqlSource(**source_db_info)
             mysql_target = MysqlTarget(**target_db_info)
             # 外键同步
@@ -1168,9 +1168,10 @@ def dbm_version(current_release=None):
 # 主程序
 if __name__ == '__main__':
     # 增加版本标识
-    current_release = 20201203
+    current_release = 20201204
     print('dbmigrate version: ' + str(current_release))
-    if not (auto_upgrade and (auto_upgrade == 0 or auto_upgrade == '0')):
+    silent_mode = silent_mode if silent_mode else 0
+    if silent_mode and silent_mode == 0:
         dbm_version(current_release=current_release)
 
     # 参数
