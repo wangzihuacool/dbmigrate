@@ -229,7 +229,7 @@ class MysqlTarget(object):
 
     # 创建目标数据库, 这里单独建立连接，db设置为None
     @staticmethod
-    def mysql_target_createdb(migrate_granularity, silent_mode=0, **target_db_info):
+    def mysql_target_createdb(migrate_granularity, p_silent_mode=0, **target_db_info):
         new_db_info = copy.deepcopy(target_db_info)
         new_db_info['db'] = None
         try:
@@ -242,7 +242,7 @@ class MysqlTarget(object):
             sys.exit(1)
         res_db = MysqlTargetDb.mysql_select('show databases')
         if to_db in [db[0] for db in res_db] and migrate_granularity == 'db':
-            if silent_mode and silent_mode == 0:
+            if p_silent_mode == 0:
                 # print('DBM Warnning: 数据库级别的同步会删除目标库，请确认！')
                 var = input('DBM Warnning: 数据库级别的同步会删除目标库,继续?y[n]')
                 if var != 'y' and var != 'Y':
