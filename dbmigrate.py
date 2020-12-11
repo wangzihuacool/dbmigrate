@@ -28,10 +28,12 @@ def mysql_db_all_migrate(from_table, source_db_info, target_db_info, p_mysql_sou
     to_table = from_table
     # 标准处理
     # 创建表
-    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
-                                    res_tablestatus=res_tablestatus)
+    table_create_manual_flag = mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
+                                                               res_tablestatus=res_tablestatus,
+                                                               res_createtable=res_createtable)
     # 创建索引
-    mysql_target.mysql_target_index(to_table, index_column_info)
+    if table_create_manual_flag == 1:
+        mysql_target.mysql_target_index(to_table, index_column_info)
     # 同步数据
     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
@@ -150,10 +152,12 @@ def mysql_to_mysql():
                 to_table = from_table
                 # 标准处理
                 # 创建表
-                mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
-                                                res_tablestatus=res_tablestatus)
+                table_create_manual_flag = mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
+                                                                           res_tablestatus=res_tablestatus,
+                                                                           res_createtable=res_createtable)
                 # 创建索引
-                mysql_target.mysql_target_index(to_table, index_column_info)
+                if table_create_manual_flag == 1:
+                    mysql_target.mysql_target_index(to_table, index_column_info)
 
                 # trigger同步
                 # to_do
@@ -211,10 +215,12 @@ def mysql_to_mysql():
                     # 删除目标表
                     mysql_target.mysql_target_execute_no_trans('drop table if exists `' + to_db + '`.`' + to_table + '`')
                     # 创建表
-                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
-                                                    res_tablestatus=res_tablestatus)
+                    table_create_manual_flag = mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
+                                                                               res_tablestatus=res_tablestatus,
+                                                                               res_createtable=res_createtable)
                     # 创建索引
-                    mysql_target.mysql_target_index(to_table, index_column_info)
+                    if table_create_manual_flag == 1:
+                        mysql_target.mysql_target_index(to_table, index_column_info)
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
@@ -265,10 +271,12 @@ def mysql_to_mysql():
                 elif to_table not in exist_table_list:
                     # 表在目标库不存在，标准处理
                     # 创建表
-                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
-                                                    res_tablestatus=res_tablestatus)
+                    table_create_manual_flag = mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
+                                                                               res_tablestatus=res_tablestatus,
+                                                                               res_createtable=res_createtable)
                     # 创建索引
-                    mysql_target.mysql_target_index(to_table, index_column_info)
+                    if table_create_manual_flag == 1:
+                        mysql_target.mysql_target_index(to_table, index_column_info)
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
                     parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
@@ -306,10 +314,12 @@ def mysql_to_mysql():
                     # 删除目标表
                     mysql_target.mysql_target_execute_no_trans('drop table if exists `' + to_db + '`.`' + to_table + '`')
                     # 创建表
-                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
-                                                    res_tablestatus=res_tablestatus)
+                    table_create_manual_flag = mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
+                                                                               res_tablestatus=res_tablestatus,
+                                                                               res_createtable=res_createtable)
                     # 创建索引
-                    mysql_target.mysql_target_index(to_table, index_column_info)
+                    if table_create_manual_flag == 1:
+                        mysql_target.mysql_target_index(to_table, index_column_info)
 
                     # trigger同步
                     # to_do
@@ -323,10 +333,12 @@ def mysql_to_mysql():
                     continue
                 elif to_table not in exist_table_list:
                     # 创建表
-                    mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
-                                                    res_tablestatus=res_tablestatus)
+                    table_create_manual_flag = mysql_target.mysql_target_table(to_table, table_exists_action, res_columns=res_columns,
+                                                                               res_tablestatus=res_tablestatus,
+                                                                               res_createtable=res_createtable)
                     # 创建索引
-                    mysql_target.mysql_target_index(to_table, index_column_info)
+                    if table_create_manual_flag == 1:
+                        mysql_target.mysql_target_index(to_table, index_column_info)
 
                     # trigger同步
                     # to_do

@@ -261,7 +261,7 @@ class MysqlTarget(object):
         return all_table_list
 
     # 目标库创建表
-    def mysql_target_table(self, to_table, table_exists_action, res_columns=None, res_tablestatus=None):
+    def mysql_target_table(self, to_table, table_exists_action, res_columns=None, res_tablestatus=None, res_createtable=None):
         self.MysqlTargetDb.mysql_execute('use %s' % self.to_db)
         #处理列信息
         all_columns_defination = ''
@@ -316,8 +316,15 @@ class MysqlTarget(object):
         else:
             sql_table_defination = 'create table `' + self.to_db + '`.`' + to_table + '` (' + all_columns_defination_1 + ')' + all_default_defination
         # print(sql_table_defination)
+        # mysql表包含分区时，使用show create table结果来创建表 add by wl_lw at 20201211
+        if 'partitioned' in res_tablestatus[0].get('create_options'):
+            table_create_manual_flag = 0
+            sql_table_defination = res_createtable[0].get('create table')
+        else:
+            table_create_manual_flag = 1
         print('[DBM] Create table `' + to_table + '`')
         table_rows = self.MysqlTargetDb.mysql_execute(sql_table_defination)
+        return table_create_manual_flag
 
     # 创建索引(不包含主键)
     # @performance
