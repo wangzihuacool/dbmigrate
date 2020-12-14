@@ -64,9 +64,10 @@ def mysql_db_migrate_parallel_subprocess(task_queue, source_db_info, target_db_i
             break
         table_name = task_queue.get()
         try:
+            mysql_db_all_migrate(table_name, source_db_info, target_db_info)
             # current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             # print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' is migrating table ' + table_name + '.')
-            mysql_db_all_migrate(table_name, source_db_info, target_db_info, p_mysql_source=mysql_source, p_mysql_target=mysql_target)
+            # mysql_db_all_migrate(table_name, source_db_info, target_db_info, p_mysql_source=mysql_source, p_mysql_target=mysql_target)
             # current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             # print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' finish migrating table ' + table_name + '.')
         except:
@@ -80,6 +81,7 @@ def mysql_db_migrate_parallel_subprocess(task_queue, source_db_info, target_db_i
 
 # mysql -> mysql 数据库同步时表并行同步的调度方法
 def mysql_db_migrate_parallel_schedule(task_list, num_of_processes=2):
+    print('[DBM] Enable parallel job for dbmigrate, parallel num is ' + str(num_of_processes) + '.')
     manager = Manager()
     task_queue = manager.Queue()
     for task in task_list:
@@ -87,7 +89,6 @@ def mysql_db_migrate_parallel_schedule(task_list, num_of_processes=2):
     for n in range(num_of_processes):
         p = Process(target=mysql_db_migrate_parallel_subprocess, args=(task_queue, source_db_info, target_db_info))
         p.start()
-    print('[DBM] Enable parallel job for dbmigrate, parallel num is ' + str(num_of_processes) + '.')
     task_queue.join()
     p.join()
 
