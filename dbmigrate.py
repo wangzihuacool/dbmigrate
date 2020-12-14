@@ -64,10 +64,9 @@ def mysql_db_migrate_parallel_subprocess(task_queue, source_db_info, target_db_i
             break
         table_name = task_queue.get()
         try:
-            mysql_db_all_migrate(table_name, source_db_info, target_db_info)
             # current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             # print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' is migrating table ' + table_name + '.')
-            # mysql_db_all_migrate(table_name, source_db_info, target_db_info, p_mysql_source=mysql_source, p_mysql_target=mysql_target)
+            mysql_db_all_migrate(table_name, source_db_info, target_db_info, p_mysql_source=mysql_source, p_mysql_target=mysql_target)
             # current_time = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
             # print('[DBM] Debug: ' + current_time + ' Process ' + str(os.getpid()) + ' finish migrating table ' + table_name + '.')
         except:

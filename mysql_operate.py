@@ -30,6 +30,9 @@ class MysqlOperate(object):
                                           password=self.password,
                                           charset=self.charset,
                                           read_timeout=None)
+        # 设置会话idle超时时间10小时，避免超时
+        with self.connection.cursor() as conn_cursor:
+            conn_cursor.execute('set wait_timeout=36000')
 
     # mysql查询语句
     #@performance
