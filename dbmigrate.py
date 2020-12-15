@@ -72,8 +72,8 @@ def mysql_db_migrate_parallel_subprocess(task_queue, source_db_info, target_db_i
         except:
             print('[DBM] Error: table ' + table_name + ' migrate failed')
             traceback.print_exc()
-            continue
-        task_queue.task_done()
+        finally:
+            task_queue.task_done()
     # mysql_source.close()
     # mysql_target.close()
 
