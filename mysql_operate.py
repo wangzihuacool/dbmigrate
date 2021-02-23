@@ -178,6 +178,10 @@ class MysqlOperateIncr(MysqlOperate):
             col_names = [i[0].lower() for i in conn_cursor.description]
             return col_names
 
+    # 关闭
+    def close(self):
+        self.connection.close()
+
 # main
 if __name__ == "__main__":
     mysql_info = {'host': '172.20.xx.xx', 'port': 3306, 'db': 'information_schema', 'user': 'xx', 'password': 'xx', 'charset': 'utf8'}

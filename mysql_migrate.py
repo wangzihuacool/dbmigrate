@@ -72,6 +72,9 @@ class MysqlSource(object):
         elif not source_tables and content == 'index':
             from_tables = all_table_list
             migrate_granularity = 'table'
+        elif not source_tables and content == 'sql':
+            from_tables = None
+            migrate_granularity = 'table'
         else:
             print('[DBM] Error: source_tables 和 content参数错误.请确认!')
             sys.exit(1)
@@ -123,9 +126,9 @@ class MysqlSource(object):
 
     # 全量获取源表数据
     def mysql_source_data(self, sql):
-        # 设置session级SQL最大执行时间为1小时
-        sql_max_exec_time = 'set max_execution_time=3600000'
-        self.MysqlDb.mysql_execute(sql_max_exec_time)
+        # 设置session级SQL最大执行时间为10小时
+        # sql_max_exec_time = 'set max_execution_time=3600000'
+        # self.MysqlDb.mysql_execute(sql_max_exec_time)
         res_data = self.MysqlDb.mysql_select(sql)
         return res_data
 
@@ -133,6 +136,11 @@ class MysqlSource(object):
     def mysql_source_column(self, sql):
         columns = self.MysqlDb.mysql_columns(sql)
         return columns
+
+    # 增量获取表数据
+    def mysql_source_data_incr(self, sql, arraysize=100000):
+        res_data = self.MysqlDb.mysql_select_incr(sql, arraysize=arraysize)
+        return res_data
 
     # 获取源表涉及的外键
     def mysql_source_fk(self, from_tables):
@@ -594,12 +602,15 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
     from_table = sql_info.get('from_table')
     to_table = sql_info.get('to_table')
     parallel_key = sql_info.get('parallel_key')
+    per_key_cardinality = sql_info.get('per_key_cardinality')
     from_rowid = sql_info.get('from_rowid')
     to_rowid = sql_info.get('to_rowid')
     max_key = sql_info.get('max_key')
     # 每进程每次同步10w行记录，分批循环处理
     batch_rows = 100000
-    batch_num = math.ceil((to_rowid - from_rowid)/batch_rows)
+    step = math.ceil(batch_rows/per_key_cardinality)
+    '''
+    # batch_num = math.ceil((to_rowid - from_rowid)/batch_rows)
     # 每进程内最大循环批次为100，超过100时则增加每次同步记录数 --modified at 20191009
     if batch_num > 100:
         batch_num = 100
@@ -608,14 +619,21 @@ def mysql_select_insert(sql_info, source_db_info, target_db_info):
     for b in range(batch_num):
         batch_from = from_rowid + (b * batch_rows)
         batch_to = to_rowid if (b == batch_num -1) else (from_rowid + ((b + 1) * batch_rows))
+    '''
+    insert_rows_list = []
+    for b in range(from_rowid, to_rowid, step):
+        batch_from = b
+        batch_to = b + step
         if batch_to >= max_key:
-            sql_select = 'select /* !40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + \
+            sql_select = 'select /* !57800 SQL_NO_CACHE max_execution_time=36000000 */ * from `' + from_db + '`.`' + from_table + '` where `' + \
                          parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` <= ' + str(max_key)
+        elif batch_to >= to_rowid:
+            sql_select = 'select /* !57800 SQL_NO_CACHE max_execution_time=36000000 */ * from `' + from_db + '`.`' + from_table + '` where `' + \
+                         parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` < ' + str(to_rowid)
         else:
-            sql_select = 'select /* !40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` < ' + str(batch_to)
-        #print(sql_select)
-        sql_data = mysql_source.mysql_source_data(sql_select)
+            sql_select = 'select /* !57800 SQL_NO_CACHE max_execution_time=36000000 */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + str(batch_from) + ' and `' + parallel_key + '` < ' + str(batch_to)
         sql_columns = mysql_source.mysql_source_column(sql_select)
+        sql_data = mysql_source.mysql_source_data(sql_select)
         insert_rows = multi_db_target.insert_target_data(to_table, sql_data, columns=sql_columns)
         insert_rows_list.append(insert_rows)
     total_rows = reduce(lambda x, y: x + y, insert_rows_list)
@@ -643,15 +661,15 @@ class MysqlDataMigrate(object):
     def mysql_serial_migrate(self, from_table, to_table):
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
-        sql_select = 'select /* !57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
+        sql_select = 'select /* !57800 SQL_NO_CACHE max_execution_time=36000000 */ * from `' + from_db + '`.`' + from_table + '`'
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')
         # 使用MysqlOperateIncr子类分批获取数据，降低客户端内存压力和网络传输压力
         mysql_source_incr = MysqlOperateIncr(**self.source_db_info)
-        # 串行获取数据时每批次获取数据量
+        # 串行获取数据时每批次获取数据量为10w
         arraysize = 100000
-        # 设置session级SQL最大执行时间为1小时
-        # sql_max_exec_time = 'set max_execution_time=3600000'
+        # 设置session级SQL最大执行时间为10小时
+        # sql_max_exec_time = 'set max_execution_time=36000000'
         # mysql_source_incr.mysql_execute(sql_max_exec_time)
         res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)
         sql_columns = mysql_source_incr.mysql_select_column(sql_select)
@@ -667,16 +685,17 @@ class MysqlDataMigrate(object):
         return total_rows
 
     # 源库是mysql时的数据同步的并行处理方法
-    def mysql_parallel_migrate(self, from_table, to_table, final_parallel, parallel_key=None, parallel_method='multiprocess'):
+    def mysql_parallel_migrate(self, from_table, to_table, final_parallel, parallel_key=None, estimated_rows=None, parallel_method='multiprocess'):
         # 分批数据
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
         # Mysql_Operate = MysqlSourceTarget(self.source_db_info, self.target_db_info)
-        sql_max_min = 'select max(`' + parallel_key + '`), min(`' + parallel_key + '`) from `' + from_db + '`.`' + from_table + '`'
+        sql_max_min = 'select /* !57800 SQL_NO_CACHE max_execution_time=36000000 */ max(`' + parallel_key + '`), min(`' + parallel_key + '`) from `' + from_db + '`.`' + from_table + '`'
         res_max_min = self.mysql_source.mysql_source_data(sql_max_min)
         max_key = res_max_min[0][0]
         min_key = res_max_min[0][1]
-        # per_rows为每进程处理的数据量
+        # per_rows为每进程处理的主键数量， per_key_cardinality为每个键值的估算数据量
+        per_key_cardinality = estimated_rows / (max_key - min_key + 1) if estimated_rows else 1
         per_rows = math.ceil((max_key - min_key + 1)/final_parallel)
 
         #源库select语句
@@ -684,14 +703,15 @@ class MysqlDataMigrate(object):
         for p in range(final_parallel):
             from_rowid = min_key + (p * per_rows)
             to_rowid = min_key + ((p + 1) * per_rows)
-            sql_info = {'from_db': from_db, 'from_table': from_table, 'to_table': to_table, 'parallel_key': parallel_key, 'per_rows': per_rows, 'from_rowid': from_rowid, 'to_rowid': to_rowid, 'max_key': max_key}
+            sql_info = {'from_db': from_db, 'from_table': from_table, 'to_table': to_table,
+                        'parallel_key': parallel_key, 'per_key_cardinality': per_key_cardinality, 'per_rows': per_rows,
+                        'from_rowid': from_rowid, 'to_rowid': to_rowid, 'max_key': max_key}
             sql_select_list.append(sql_info)
             #sql_select = 'select /* !40001 SQL_NO_CACHE */ * from `' + from_db + '`.`' + from_table + '` where `' + parallel_key + '` >= ' + \
             #             str(min_key + (p * per_rows)) + ' and `' + parallel_key + '` < ' + str(min_key + ((p + 1) * per_rows))
             #select_insert_dict = {'table_name': to_table, 'sql_statement': sql_select}
             #sql_select_list.append(select_insert_dict)
         #print(sql_select_list)
-
         print('[DBM] Inserting data into table `' + to_table + '`')
         #多进程
         if parallel_method == 'multiprocess':
@@ -735,6 +755,8 @@ class MysqlDataMigrate(object):
         else:
             parallel_key = None
             parallel_flag = 0
+        estimated_rows = res_tablestatus[0].get('rows') if res_tablestatus[0].get('rows') else math.ceil(
+            res_tablestatus[0].get('data_length') / 1000)
         # 设置并行方式(linux为多进程，windows为多线程) 和 最大并发数, （多线程速度较慢，这里全改为多进程）
         #parallel_method = 'multiprocess' if os.name == 'posix' else 'threading'
         parallel_method = 'multiprocess'
@@ -746,13 +768,13 @@ class MysqlDataMigrate(object):
             final_parallel = max(min(auto_parallel, max_parallel), 1)
         else:
             final_parallel = min(parallel, max_parallel*2)
-        return parallel_flag, final_parallel, parallel_key, parallel_method
+        return parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows
 
     # 源库是mysql时的增量数据同步串行处理方法
     def mysql_incr_serial_migrate(self, from_table, to_table, incremental_method=None, where_clause=None):
         from_db = self.source_db_info.get('db')
         to_db = self.target_db_info.get('db')
-        sql_select_original = 'select /* !57800 SQL_NO_CACHE max_execution_time=3600000 */ * from `' + from_db + '`.`' + from_table + '`'
+        sql_select_original = 'select /* !57800 SQL_NO_CACHE max_execution_time=36000000 */ * from `' + from_db + '`.`' + from_table + '`'
         sql_select = sql_select_original + ' ' + where_clause if incremental_method == 'where' else sql_select_original
         sql_info = {'table_name': to_table, 'sql_statement': sql_select}
         print('[DBM] Inserting data into table `' + to_table + '`')
@@ -760,8 +782,33 @@ class MysqlDataMigrate(object):
         mysql_source_incr = MysqlOperateIncr(**self.source_db_info)
         # 串行获取数据时每批次获取数据量
         arraysize = 10000
-        # 设置session级SQL最大执行时间为1小时
-        # sql_max_exec_time = 'set max_execution_time=3600000'
+        # 设置session级SQL最大执行时间为10小时
+        # sql_max_exec_time = 'set max_execution_time=36000000'
+        # mysql_source_incr.mysql_execute(sql_max_exec_time)
+        columns = mysql_source_incr.mysql_select_column(sql_select)
+        res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)
+        insert_rows_list = []
+        while True:
+            data_incr = next(res_data_incr)
+            if data_incr:
+                insert_rows = self.multi_db_target.insert_target_data(to_table, data_incr, columns=columns)
+                insert_rows_list.append(insert_rows)
+            else:
+                break
+        total_rows = reduce(lambda x, y: x + y, insert_rows_list) if insert_rows_list else 0
+        return total_rows
+
+    # 源库是mysql时，获取源库SQL执行结果同步到目标库处理方法
+    def mysql_sql_serial_migrate(self, to_table, where_clause=None):
+        sql_select = where_clause
+        sql_info = {'table_name': to_table, 'sql_statement': sql_select}
+        print('[DBM] Inserting data into table `' + to_table + '`')
+        # 使用MysqlOperateIncr子类分批获取数据，降低客户端内存压力和网络传输压力
+        mysql_source_incr = MysqlOperateIncr(**self.source_db_info)
+        # 串行获取数据时每批次获取数据量
+        arraysize = 10000
+        # 设置session级SQL最大执行时间为10小时
+        # sql_max_exec_time = 'set max_execution_time=36000000'
         # mysql_source_incr.mysql_execute(sql_max_exec_time)
         columns = mysql_source_incr.mysql_select_column(sql_select)
         res_data_incr = mysql_source_incr.mysql_select_incr(sql_select, arraysize=arraysize)

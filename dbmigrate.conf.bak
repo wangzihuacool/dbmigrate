@@ -21,15 +21,16 @@ target_port = 3306
 target_db = 'xxxx'                                                    # 目标库名称，目标库名称可以指定与源库不一样；当target_db为空时，则在目标库新建一个与源库同名的数据库
 target_user = 'test'
 target_password = 'test'
-target_tables = None                                                  # 目标表，目标表目前不支持手动指定名称，默认跟source_tables一致
+target_tables = None                                                  # 目标表，默认跟source_tables一致；当content='sql'时需要指定目标表名
 
 #通用配置
-content = 'metadata'                                                  # [all] - 同步元数据+数据，[metadata] - 只同步元数据，[data] - 只同步数据, [index] - 只同步索引, [increment] - 增量同步数据
+content = 'all'                                                  # [all] - 同步元数据+数据，[metadata] - 只同步元数据，[data] - 只同步数据, [index] - 只同步索引, [increment] - 增量同步数据, [sql] - 源库SQL返回结果插入到目标库
+exclude_tables = []                                                    # 全库同步时排除部分表,以列表方式存储，默认为空
 parallel = 0                                                          # 手动指定并行度，为0则由程序自行判断是否并行，建议配置为0
-performance_mode = 1                                                  # 是否开启高性能模式，可选项：0-关闭，1-打开，默认为0-关闭；开启后会消耗更多的系统资源
+performance_mode = 0                                                  # 是否开启高性能模式，可选项：0-关闭，1-打开，默认为0-关闭；开启后会消耗更多的系统资源
 table_exists_action = 'drop'                                          # 目标表在目标库已存在时的处理方式：drop - 删除旧表；truncate - truncate表数据；append - 插入数据；skip - 跳过该表
 incremental_method = 'where'                                          # 获取增量数据的方式，[where] - 自定义where查询条件
-where_clause = 'where create_time >= date_sub(curdate(), interval 2 day)'   # 获取增量数据时的查询条件,仅当content='increment'和incremental_method='where'时生效
+where_clause = 'where create_time >= date_sub(curdate(), interval 2 day)'   # 获取增量数据时的查询条件,仅当content='increment'和incremental_method='where'时生效；获取源库SQL查询结果插入到目标库对应表，仅当content='sql'和target_tables不为空时生效
 
 #软件配置
 silent_mode = 0                                                       # 是否静默模式，默认为0即非静默模式，dbmigrate作为后台任务执行时可设置为1

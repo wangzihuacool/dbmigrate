@@ -36,15 +36,17 @@ def mysql_db_all_migrate(from_table, source_db_info, target_db_info, p_mysql_sou
         mysql_target.mysql_target_index(to_table, index_column_info)
     # 同步数据
     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
-                                                                                                 res_tablestatus,
-                                                                                                 res_columns,
-                                                                                                 parallel=parallel)
+    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(
+        from_table,
+        res_tablestatus,
+        res_columns,
+        parallel=parallel)
     if parallel_flag == 0:
         total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
     else:
         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel, parallel_key=parallel_key,
-                                                      parallel_method=parallel_method)
+                                                      parallel_method=parallel_method,
+                                                      estimated_rows=estimated_rows)
     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
     # trigger同步
     # to_do
@@ -100,7 +102,7 @@ def mysql_to_mysql():
     mysql_source.source_db_check()
     from_tables, migrate_granularity = mysql_source.source_table_check(*source_tables, content=content)
     mysql_target.mysql_target_createdb(migrate_granularity, p_silent_mode=silent_mode, **target_db_info)
-    target_tables = from_tables
+    from_tables = list(set(from_tables) - set(exclude_tables)) if exclude_tables else from_tables if from_tables else target_tables
     mysql_source.close()
     mysql_target.close()
 
@@ -111,7 +113,7 @@ def mysql_to_mysql():
             # 表同步(根据是否开启性能模式来选择是否需要表之间并行同步，开启表并行时默认最大并发为8，也可手动设置)
             # 动态计算表迁移并行度
             if performance_mode and performance_mode == 1:
-                table_parallel = int(min(round(len(from_tables)/50), cpu_count()/2, 8))
+                table_parallel = max(int(min(round(len(from_tables)/50), cpu_count()/2, 8)), 1)
                 # n = ceil(len(from_tables)/table_parallel)
                 # from_tables_list = [from_tables[i:i+n] for i in range(0, len(from_tables), n)]
                 mysql_db_migrate_parallel_schedule(from_tables, table_parallel)
@@ -223,16 +225,18 @@ def mysql_to_mysql():
                         mysql_target.mysql_target_index(to_table, index_column_info)
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
-                                                                                                                 res_tablestatus,
-                                                                                                                 res_columns,
-                                                                                                                 parallel=parallel)
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(
+                        from_table,
+                        res_tablestatus,
+                        res_columns,
+                        parallel=parallel)
                     if parallel_flag == 0:
                         total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
-                                                                      parallel_method=parallel_method)
+                                                                      parallel_method=parallel_method,
+                                                                      estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                     # trigger同步
@@ -243,17 +247,17 @@ def mysql_to_mysql():
                     mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table, res_tablestatus, res_columns, parallel=parallel)
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(from_table, res_tablestatus, res_columns, parallel=parallel)
                     if parallel_flag == 0:
                         total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
                     else:
-                        total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel, parallel_key=parallel_key, parallel_method=parallel_method)
+                        total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel, parallel_key=parallel_key, parallel_method=parallel_method, estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(from_table,
                                                                                                                  res_tablestatus,
                                                                                                                  res_columns,
                                                                                                                  parallel=parallel)
@@ -262,7 +266,8 @@ def mysql_to_mysql():
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
-                                                                      parallel_method=parallel_method)
+                                                                      parallel_method=parallel_method,
+                                                                      estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                 elif to_table in exist_table_list and table_exists_action == 'skip':
@@ -279,16 +284,18 @@ def mysql_to_mysql():
                         mysql_target.mysql_target_index(to_table, index_column_info)
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
-                                                                                                                 res_tablestatus,
-                                                                                                                 res_columns,
-                                                                                                                 parallel=parallel)
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(
+                        from_table,
+                        res_tablestatus,
+                        res_columns,
+                        parallel=parallel)
                     if parallel_flag == 0:
                         total_rows = mysql_dbm.mysql_serial_migrate(from_table, to_table)
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
-                                                                      parallel_method=parallel_method)
+                                                                      parallel_method=parallel_method,
+                                                                      estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
 
                     # trigger同步
@@ -365,7 +372,7 @@ def mysql_to_mysql():
                     mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(from_table,
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(from_table,
                                                                                                                  res_tablestatus,
                                                                                                                  res_columns,
                                                                                                                  parallel=parallel)
@@ -374,12 +381,13 @@ def mysql_to_mysql():
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
-                                                                      parallel_method=parallel_method)
+                                                                      parallel_method=parallel_method,
+                                                                      estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 同步数据
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(
                         from_table,
                         res_tablestatus,
                         res_columns,
@@ -389,7 +397,8 @@ def mysql_to_mysql():
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
-                                                                      parallel_method=parallel_method)
+                                                                      parallel_method=parallel_method,
+                                                                      estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
@@ -454,6 +463,35 @@ def mysql_to_mysql():
                     print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
                 else:
                     print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+
+        elif content == 'sql':
+            # 同步源库SQL返回结果到目标库, added by wl_lw at 20210223
+            if not (from_tables and where_clause and not (where_clause.startswith('where') or where_clause.startswith('WHERE'))):
+                print('[DBM] error 100: 参数错误, target_tables=%s 或者 where_clause=%s 参数错误.' % (target_tables, where_clause))
+                sys.exit(1)
+            for from_table in from_tables:
+                # 目标表
+                exist_table_list = mysql_target.mysql_target_exist_tables()
+                to_table = from_table
+                if to_table in exist_table_list and table_exists_action == 'drop':
+                    print('[DBM] error 100 : 参数错误，table_exists_action=%s 参数错误.' % table_exists_action)
+                    sys.exit(1)
+                elif to_table in exist_table_list and table_exists_action == 'truncate':
+                    # truncate目标表
+                    print('[DBM] truncate table ' + to_table)
+                    numrows = mysql_target.mysql_target_execute_no_trans('truncate table `' + to_db + '`.`' + to_table + '`')
+                    # 同步数据, SQL同步目前只支持串行
+                    mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
+                    total_rows = mysql_dbm.mysql_sql_serial_migrate(to_table, where_clause=where_clause)
+                elif to_table in exist_table_list and table_exists_action == 'append':
+                    # 同步数据, SQL同步目前只支持串行
+                    mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
+                    total_rows = mysql_dbm.mysql_sql_serial_migrate(to_table, where_clause=where_clause)
+                elif to_table in exist_table_list and table_exists_action == 'skip':
+                    print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
+                else:
+                    print('[DBM] error 101 : 目标表[%s]不存在' % to_table)
+
         else:
             print('[DBM] error 100 : content=%s 参数错误.' % content)
         mysql_source.close()
@@ -495,7 +533,7 @@ def mysql_to_oracle():
                     oracle_target.oracle_execute_dml(truncate_sql)
                     # 同步数据, 源库是mysql，执行MysqlDataMigrate
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(
                         from_table,
                         res_tablestatus,
                         res_columns,
@@ -505,12 +543,13 @@ def mysql_to_oracle():
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
-                                                                      parallel_method=parallel_method)
+                                                                      parallel_method=parallel_method,
+                                                                      estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'append':
                     # 数据追加到目标表
                     mysql_dbm = MysqlDataMigrate(source_db_info, target_db_info)
-                    parallel_flag, final_parallel, parallel_key, parallel_method = mysql_dbm.mysql_parallel_flag(
+                    parallel_flag, final_parallel, parallel_key, parallel_method, estimated_rows = mysql_dbm.mysql_parallel_flag(
                         from_table,
                         res_tablestatus,
                         res_columns,
@@ -520,7 +559,8 @@ def mysql_to_oracle():
                     else:
                         total_rows = mysql_dbm.mysql_parallel_migrate(from_table, to_table, final_parallel,
                                                                       parallel_key=parallel_key,
-                                                                      parallel_method=parallel_method)
+                                                                      parallel_method=parallel_method,
+                                                                      estimated_rows=estimated_rows)
                     print('[DBM] Inserted ' + str(total_rows) + ' rows into table `' + to_table + '`')
                 elif to_table in exist_table_list and table_exists_action == 'skip':
                     print('[DBM] table ' + to_table + ' skiped due to table_exists_action == skip')
@@ -1180,7 +1220,7 @@ def dbm_version(current_release=None):
 # 主程序
 if __name__ == '__main__':
     # 增加版本标识
-    current_release = 20201204
+    current_release = 20210223
     print('dbmigrate version: ' + str(current_release))
     silent_mode = silent_mode if silent_mode else 0
     if silent_mode and silent_mode == 0:
@@ -1197,6 +1237,7 @@ if __name__ == '__main__':
     to_db = target_db
     # source_tables = list(map(lambda x: x.lower(), source_tables))
     content = content
+    exclude_tables = exclude_tables
     source_db_info = {'host': source_host, 'port': source_port, 'db': source_db, 'user': source_user,
                       'password': source_password, 'charset': 'utf8', 'source_db_type': source_db_type}
     target_db_info = {'host': target_host, 'port': target_port, 'db': target_db, 'user': target_user,

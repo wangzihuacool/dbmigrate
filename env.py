@@ -44,6 +44,7 @@ target_password = conf.get('target_password')
 target_tables = conf.get('target_tables')
 # section：通用配置
 content = conf.get('content')
+exclude_tables = conf.get('exclude_tables')
 parallel = conf.get('parallel')
 performance_mode = conf.get('performance_mode')
 table_exists_action = conf.get('table_exists_action')
